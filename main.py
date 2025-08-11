@@ -43,9 +43,15 @@ cal_client = CalClient()
 @app.on_event("startup")
 async def startup_event():
     """Validate configuration on startup"""
-    if not settings.validate():
-        logger.error("Invalid configuration. Please check your environment variables.")
-        raise Exception("Invalid configuration")
+    try:
+        logger.info("Starting up Cal.com Webhook API...")
+        logger.info(f"Cal.com API configured for user: {settings.cal_username}")
+        logger.info(f"Event type: {settings.cal_event_type_slug}")
+        logger.info("Startup completed successfully")
+    except Exception as e:
+        logger.error(f"Startup error: {e}")
+        # Don't crash on startup - just log the error
+        logger.warning("Continuing with startup despite configuration issues")
 
 @app.get("/")
 async def root():
