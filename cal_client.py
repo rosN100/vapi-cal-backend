@@ -14,7 +14,7 @@ class CalClient:
         self.base_url = settings.cal_base_url
         self.username = settings.cal_username
         self.event_type_slug = settings.cal_event_type_slug
-        self.team_slug = "soraaya-team"  # Add team slug for build3-demo
+        self.team_id = 85823  # Use team ID instead of slug
         self.user_id = None  # Will be fetched on first use
         self.headers = {
             "Content-Type": "application/json"
@@ -75,7 +75,7 @@ class CalClient:
                 url = f"{self.base_url}/availability"
                 params = {
                     "apiKey": self.api_key,
-                    "teamSlug": self.team_slug,
+                    "teamId": self.team_id,
                     "eventTypeSlug": self.event_type_slug,
                     "dateFrom": start_date.isoformat(),
                     "dateTo": end_date.isoformat(),
@@ -179,12 +179,9 @@ class CalClient:
     async def _get_event_type(self, user_id: int) -> Optional[Dict]:
         """Get event type details - handle both personal and team events"""
         try:
-            # First try team events (since build3-demo is a team event)
-            team_url = f"{self.base_url}/event-types"
-            team_params = {
-                "apiKey": self.api_key,
-                "teamSlug": self.team_slug
-            }
+            # First try team events using team ID
+            team_url = f"{self.base_url}/teams/{self.team_id}/event-types"
+            team_params = {"apiKey": self.api_key}
             
             async with httpx.AsyncClient() as client:
                 response = await client.get(team_url, params=team_params)
