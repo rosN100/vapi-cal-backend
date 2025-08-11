@@ -47,6 +47,8 @@ async def startup_event():
         logger.info("Starting up Cal.com Webhook API...")
         logger.info(f"Cal.com API configured for user: {settings.cal_username}")
         logger.info(f"Event type: {settings.cal_event_type_slug}")
+        logger.info(f"PORT environment variable: {os.getenv('PORT', 'NOT SET')}")
+        logger.info(f"Railway PORT: {os.getenv('PORT', 'NOT SET')}")
         logger.info("Startup completed successfully")
     except Exception as e:
         logger.error(f"Startup error: {e}")
