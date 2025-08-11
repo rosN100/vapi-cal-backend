@@ -195,4 +195,7 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=port,
         reload=False  # Disable reload in production
-    ) 
+    )
+
+# For Railway deployment, ensure we bind to the correct port
+# This ensures the app listens on the port Railway expects 
