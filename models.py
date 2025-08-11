@@ -3,7 +3,7 @@ from typing import List, Optional
 from datetime import datetime, date
 
 class CheckAvailabilityRequest(BaseModel):
-    date: date = Field(..., description="Date to check availability for (YYYY-MM-DD)")
+    target_date: date = Field(..., description="Date to check availability for (YYYY-MM-DD)")
     time_range_days: Optional[int] = Field(None, description="Number of days to check (default from env)")
 
 class TimeSlot(BaseModel):
@@ -13,12 +13,12 @@ class TimeSlot(BaseModel):
 
 class CheckAvailabilityResponse(BaseModel):
     success: bool = Field(..., description="Whether the request was successful")
-    date: date = Field(..., description="Date checked")
+    target_date: date = Field(..., description="Date checked")
     available_slots: List[TimeSlot] = Field(..., description="List of available time slots")
     message: Optional[str] = Field(None, description="Additional message or error details")
 
 class BookAppointmentRequest(BaseModel):
-    date: date = Field(..., description="Date for the appointment (YYYY-MM-DD)")
+    target_date: date = Field(..., description="Date for the appointment (YYYY-MM-DD)")
     time: str = Field(..., description="Start time in HH:MM format")
     candidate_name: str = Field(..., description="Name of the candidate")
 

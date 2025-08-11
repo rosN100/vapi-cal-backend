@@ -66,16 +66,16 @@ async def check_availability(request: CheckAvailabilityRequest):
     Webhook endpoint for Vapi AI agent to check calendar availability
     
     Args:
-        request: Contains the date to check and optional time range
+        request: Contains the target_date to check and optional time range
         
     Returns:
         Available time slots for the specified date range
     """
     try:
-        logger.info(f"Checking availability for date: {request.date}")
+        logger.info(f"Checking availability for date: {request.target_date}")
         
         # Validate date is not in the past
-        if request.date < date.today():
+        if request.target_date < date.today():
             raise HTTPException(
                 status_code=400, 
                 detail="Cannot check availability for past dates"
@@ -83,7 +83,7 @@ async def check_availability(request: CheckAvailabilityRequest):
         
         # Check availability using Cal.com client
         available_slots = await cal_client.check_availability(
-            target_date=request.date,
+            target_date=request.target_date,
             time_range_days=request.time_range_days
         )
         
@@ -98,7 +98,7 @@ async def check_availability(request: CheckAvailabilityRequest):
         
         return CheckAvailabilityResponse(
             success=True,
-            date=request.date,
+            target_date=request.target_date,
             available_slots=time_slots,
             message=f"Found {len(time_slots)} available slots"
         )
@@ -118,16 +118,16 @@ async def book_appointment(request: BookAppointmentRequest):
     Webhook endpoint for Vapi AI agent to book an appointment
     
     Args:
-        request: Contains the date, time, and candidate name
+        request: Contains the target_date, time, and candidate name
         
     Returns:
         Confirmation of the booking with details
     """
     try:
-        logger.info(f"Booking appointment for {request.candidate_name} on {request.date} at {request.time}")
+        logger.info(f"Booking appointment for {request.candidate_name} on {request.target_date} at {request.time}")
         
         # Validate date is not in the past
-        if request.date < date.today():
+        if request.target_date < date.today():
             raise HTTPException(
                 status_code=400, 
                 detail="Cannot book appointments for past dates"
@@ -144,7 +144,7 @@ async def book_appointment(request: BookAppointmentRequest):
         
         # Book appointment using Cal.com client
         booking_result = await cal_client.book_appointment(
-            appointment_date=request.date,
+            appointment_date=request.target_date,
             appointment_time=request.time,
             candidate_name=request.candidate_name
         )
