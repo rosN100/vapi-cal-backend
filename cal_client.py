@@ -14,6 +14,7 @@ class CalClient:
         self.base_url = settings.cal_base_url
         self.username = settings.cal_username
         self.event_type_slug = settings.cal_event_type_slug
+        self.team_slug = "soraaya-team"  # Add team slug for build3-demo
         self.user_id = None  # Will be fetched on first use
         self.headers = {
             "Content-Type": "application/json"
@@ -69,14 +70,26 @@ class CalClient:
             start_date = target_date
             end_date = target_date + timedelta(days=time_range_days)
             
-            url = f"{self.base_url}/users/{user_id}/availability"
-            params = {
-                "apiKey": self.api_key,
-                "eventTypeId": event_type["id"],
-                "dateFrom": start_date.isoformat(),
-                "dateTo": end_date.isoformat(),
-                "duration": settings.default_slot_duration_minutes
-            }
+            # Use team availability endpoint for team events
+            if event_type.get("teamId"):
+                url = f"{self.base_url}/availability"
+                params = {
+                    "apiKey": self.api_key,
+                    "teamSlug": self.team_slug,
+                    "eventTypeSlug": self.event_type_slug,
+                    "dateFrom": start_date.isoformat(),
+                    "dateTo": end_date.isoformat(),
+                    "duration": settings.default_slot_duration_minutes
+                }
+            else:
+                url = f"{self.base_url}/users/{user_id}/availability"
+                params = {
+                    "apiKey": self.api_key,
+                    "eventTypeId": event_type["id"],
+                    "dateFrom": start_date.isoformat(),
+                    "dateTo": end_date.isoformat(),
+                    "duration": settings.default_slot_duration_minutes
+                }
             
             async with httpx.AsyncClient() as client:
                 response = await client.get(url, params=params)
@@ -110,8 +123,13 @@ class CalClient:
                 raise Exception("Failed to get event type details")
             
             # Create booking
-            url = f"{self.base_url}/users/{user_id}/bookings"
-            params = {"apiKey": self.api_key}
+            if event_type.get("teamId"):
+                # Use team booking endpoint for team events
+                url = f"{self.base_url}/bookings"
+                params = {"apiKey": self.api_key}
+            else:
+                url = f"{self.base_url}/users/{user_id}/bookings"
+                params = {"apiKey": self.api_key}
             
             # Parse time and create datetime
             time_obj = datetime.strptime(appointment_time, "%H:%M").time()
@@ -159,24 +177,42 @@ class CalClient:
             raise Exception(f"Failed to book appointment: {e}")
     
     async def _get_event_type(self, user_id: int) -> Optional[Dict]:
-        """Get event type details"""
+        """Get event type details - handle both personal and team events"""
         try:
-            url = f"{self.base_url}/users/{user_id}/event-types"
-            params = {"apiKey": self.api_key}
+            # First try team events (since build3-demo is a team event)
+            team_url = f"{self.base_url}/event-types"
+            team_params = {
+                "apiKey": self.api_key,
+                "teamSlug": self.team_slug
+            }
             
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, params=params)
+                response = await client.get(team_url, params=team_params)
+                if response.status_code == 200:
+                    data = response.json()
+                    event_types = data.get("event_types", [])
+                    
+                    # Find the build3-demo event type
+                    for event_type in event_types:
+                        if event_type.get("slug") == self.event_type_slug:
+                            logger.info(f"Found team event type: {event_type}")
+                            return event_type
+                
+                # Fallback to personal events if team event not found
+                personal_url = f"{self.base_url}/users/{user_id}/event-types"
+                personal_params = {"apiKey": self.api_key}
+                
+                response = await client.get(personal_url, params=personal_params)
                 response.raise_for_status()
                 
                 data = response.json()
                 event_types = data.get("event_types", [])
                 
-                # Find the specific event type
                 for event_type in event_types:
                     if event_type.get("slug") == self.event_type_slug:
                         return event_type
                 
-                logger.error(f"Event type '{self.event_type_slug}' not found")
+                logger.error(f"Event type '{self.event_type_slug}' not found in personal or team events")
                 return None
                 
         except Exception as e:
