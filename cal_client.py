@@ -50,7 +50,7 @@ class CalClient:
             logger.error(f"Error getting user ID: {e}")
             return None
     
-    async def check_availability(self, target_date: date, time_range_days: int = None) -> List[Dict]:
+    async def check_availability(self, target_date: date, time_range_days: int = None) -> Dict:
         """Check availability for a specific date range"""
         if time_range_days is None:
             time_range_days = settings.default_time_range_days
@@ -100,7 +100,17 @@ class CalClient:
                 
                 # Process availability data
                 available_slots = self._process_availability(data, target_date)
-                return available_slots
+                
+                # Format the response as readable text
+                formatted_response = self._format_availability_response(available_slots, target_date)
+                
+                return {
+                    "success": True,
+                    "target_date": target_date.strftime('%Y-%m-%d'),
+                    "available_slots": available_slots,
+                    "formatted_response": formatted_response,
+                    "message": f"Found {len(available_slots)} available slots"
+                }
                 
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error checking availability: {e}")
@@ -244,6 +254,21 @@ class CalClient:
         except Exception as e:
             logger.error(f"Error processing availability: {e}")
             return []
+    
+    def _format_availability_response(self, available_slots: List[Dict], target_date: date) -> str:
+        """Format availability response as readable text"""
+        if not available_slots:
+            return f"No available slots found for {target_date.strftime('%Y-%m-%d')}"
+        
+        # Extract start times and format them
+        start_times = [slot["start_time"] for slot in available_slots if slot.get("available")]
+        
+        # Format the response
+        formatted_response = f"Available slots for {target_date.strftime('%Y-%m-%d')}:\n"
+        formatted_response += ", ".join(start_times)
+        formatted_response += f"\n\nTotal: {len(start_times)} slots available"
+        
+        return formatted_response
     
     def _generate_business_hours(self, target_date: date) -> List[Dict]:
         """Generate default business hours for a given date"""

@@ -91,26 +91,19 @@ async def check_availability(request: CheckAvailabilityRequest):
             )
         
         # Check availability using Cal.com client
-        available_slots = await cal_client.check_availability(
+        availability_result = await cal_client.check_availability(
             target_date=request.target_date,
             time_range_days=request.time_range_days
         )
         
-        # Convert to TimeSlot models
-        time_slots = []
-        for slot in available_slots:
-            time_slots.append(TimeSlot(
-                start_time=slot["start_time"],
-                end_time=slot["end_time"],
-                available=slot["available"]
-            ))
-        
-        return CheckAvailabilityResponse(
-            success=True,
-            target_date=request.target_date,
-            available_slots=time_slots,
-            message=f"Found {len(time_slots)} available slots"
-        )
+        # Return the formatted response directly
+        return {
+            "success": availability_result["success"],
+            "target_date": availability_result["target_date"],
+            "available_slots": availability_result["available_slots"],
+            "formatted_response": availability_result["formatted_response"],
+            "message": availability_result["message"]
+        }
         
     except HTTPException:
         raise

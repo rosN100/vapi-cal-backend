@@ -15,6 +15,7 @@ class CheckAvailabilityResponse(BaseModel):
     success: bool = Field(..., description="Whether the request was successful")
     target_date: date_type = Field(..., description="Date checked")
     available_slots: List[TimeSlot] = Field(..., description="List of available time slots")
+    formatted_response: str = Field(..., description="Formatted text response with available slots")
     message: Optional[str] = Field(None, description="Additional message or error details")
 
 class BookAppointmentRequest(BaseModel):
