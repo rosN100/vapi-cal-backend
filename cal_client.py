@@ -14,21 +14,54 @@ class CalClient:
         self.base_url = settings.cal_base_url
         self.username = settings.cal_username
         self.event_type_slug = settings.cal_event_type_slug
+        self.user_id = None  # Will be fetched on first use
         self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
     
+    async def _get_user_id(self) -> Optional[int]:
+        """Get user ID from Cal.com API"""
+        if self.user_id:
+            return self.user_id
+            
+        try:
+            url = f"{self.base_url}/users"
+            params = {"apiKey": self.api_key}
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                
+                data = response.json()
+                logger.info(f"Users response: {data}")
+                
+                # Find user by username
+                for user in data.get("users", []):
+                    if user.get("username") == self.username:
+                        self.user_id = user.get("id")
+                        logger.info(f"Found user ID: {self.user_id} for username: {self.username}")
+                        return self.user_id
+                
+                logger.error(f"User '{self.username}' not found")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting user ID: {e}")
+            return None
+    
     async def check_availability(self, target_date: date, time_range_days: int = None) -> List[Dict]:
-        """
-        Check availability for a specific date range
-        """
+        """Check availability for a specific date range"""
         if time_range_days is None:
             time_range_days = settings.default_time_range_days
             
         try:
-            # Get event type details first
-            event_type = await self._get_event_type()
+            # Get user ID first
+            user_id = await self._get_user_id()
+            if not user_id:
+                raise Exception("Failed to get user ID")
+            
+            # Get event type details
+            event_type = await self._get_event_type(user_id)
             if not event_type:
                 raise Exception("Failed to get event type details")
             
@@ -36,17 +69,17 @@ class CalClient:
             start_date = target_date
             end_date = target_date + timedelta(days=time_range_days)
             
-            url = f"{self.base_url}/availability"
+            url = f"{self.base_url}/users/{user_id}/availability"
             params = {
-                "username": self.username,
-                "eventTypeSlug": self.event_type_slug,
+                "apiKey": self.api_key,
+                "eventTypeId": event_type["id"],
                 "dateFrom": start_date.isoformat(),
                 "dateTo": end_date.isoformat(),
                 "duration": settings.default_slot_duration_minutes
             }
             
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, headers=self.headers, params=params)
+                response = await client.get(url, params=params)
                 response.raise_for_status()
                 
                 data = response.json()
@@ -64,17 +97,21 @@ class CalClient:
             raise Exception(f"Failed to check availability: {e}")
     
     async def book_appointment(self, appointment_date: date, appointment_time: str, candidate_name: str) -> Dict:
-        """
-        Book an appointment using Cal.com API
-        """
+        """Book an appointment using Cal.com API"""
         try:
+            # Get user ID first
+            user_id = await self._get_user_id()
+            if not user_id:
+                raise Exception("Failed to get user ID")
+            
             # Get event type details
-            event_type = await self._get_event_type()
+            event_type = await self._get_event_type(user_id)
             if not event_type:
                 raise Exception("Failed to get event type details")
             
             # Create booking
-            url = f"{self.base_url}/bookings"
+            url = f"{self.base_url}/users/{user_id}/bookings"
+            params = {"apiKey": self.api_key}
             
             # Parse time and create datetime
             time_obj = datetime.strptime(appointment_time, "%H:%M").time()
@@ -96,11 +133,11 @@ class CalClient:
                 ],
                 "title": call_title,
                 "description": f"Build3 demo call with {candidate_name}",
-                "timeZone": "UTC"  # You can make this configurable
+                "timeZone": "UTC"
             }
             
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, headers=self.headers, json=booking_data)
+                response = await client.post(url, params=params, json=booking_data)
                 response.raise_for_status()
                 
                 data = response.json()
@@ -121,18 +158,14 @@ class CalClient:
             logger.error(f"Error booking appointment: {e}")
             raise Exception(f"Failed to book appointment: {e}")
     
-    async def _get_event_type(self) -> Optional[Dict]:
-        """
-        Get event type details
-        """
+    async def _get_event_type(self, user_id: int) -> Optional[Dict]:
+        """Get event type details"""
         try:
-            url = f"{self.base_url}/event-types"
-            params = {
-                "username": self.username
-            }
+            url = f"{self.base_url}/users/{user_id}/event-types"
+            params = {"apiKey": self.api_key}
             
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, headers=self.headers, params=params)
+                response = await client.get(url, params=params)
                 response.raise_for_status()
                 
                 data = response.json()
@@ -151,9 +184,7 @@ class CalClient:
             return None
     
     def _process_availability(self, availability_data: Dict, target_date: date) -> List[Dict]:
-        """
-        Process availability data and return available time slots
-        """
+        """Process availability data and return available time slots"""
         available_slots = []
         
         try:
@@ -182,9 +213,7 @@ class CalClient:
             return []
     
     def _generate_business_hours(self, target_date: date) -> List[Dict]:
-        """
-        Generate default business hours for a given date
-        """
+        """Generate default business hours for a given date"""
         slots = []
         start_hour = 9  # 9 AM
         end_hour = 17   # 5 PM
