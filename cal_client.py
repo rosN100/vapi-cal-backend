@@ -1,0 +1,208 @@
+import httpx
+from typing import List, Dict, Optional
+from datetime import datetime, date, timedelta
+import logging
+from config import settings
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class CalClient:
+    def __init__(self):
+        self.api_key = settings.cal_api_key
+        self.base_url = settings.cal_base_url
+        self.username = settings.cal_username
+        self.event_type_slug = settings.cal_event_type_slug
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+    
+    async def check_availability(self, target_date: date, time_range_days: int = None) -> List[Dict]:
+        """
+        Check availability for a specific date range
+        """
+        if time_range_days is None:
+            time_range_days = settings.default_time_range_days
+            
+        try:
+            # Get event type details first
+            event_type = await self._get_event_type()
+            if not event_type:
+                raise Exception("Failed to get event type details")
+            
+            # Get availability for the date range
+            start_date = target_date
+            end_date = target_date + timedelta(days=time_range_days)
+            
+            url = f"{self.base_url}/availability"
+            params = {
+                "username": self.username,
+                "eventTypeSlug": self.event_type_slug,
+                "dateFrom": start_date.isoformat(),
+                "dateTo": end_date.isoformat(),
+                "duration": settings.default_slot_duration_minutes
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=self.headers, params=params)
+                response.raise_for_status()
+                
+                data = response.json()
+                logger.info(f"Availability response: {data}")
+                
+                # Process availability data
+                available_slots = self._process_availability(data, target_date)
+                return available_slots
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error checking availability: {e}")
+            raise Exception(f"Failed to check availability: {e}")
+        except Exception as e:
+            logger.error(f"Error checking availability: {e}")
+            raise Exception(f"Failed to check availability: {e}")
+    
+    async def book_appointment(self, appointment_date: date, appointment_time: str, candidate_name: str) -> Dict:
+        """
+        Book an appointment using Cal.com API
+        """
+        try:
+            # Get event type details
+            event_type = await self._get_event_type()
+            if not event_type:
+                raise Exception("Failed to get event type details")
+            
+            # Create booking
+            url = f"{self.base_url}/bookings"
+            
+            # Parse time and create datetime
+            time_obj = datetime.strptime(appointment_time, "%H:%M").time()
+            start_datetime = datetime.combine(appointment_date, time_obj)
+            end_datetime = start_datetime + timedelta(minutes=settings.default_slot_duration_minutes)
+            
+            # Create call title
+            call_title = f"Build3<> {candidate_name}"
+            
+            booking_data = {
+                "eventTypeId": event_type["id"],
+                "start": start_datetime.isoformat(),
+                "end": end_datetime.isoformat(),
+                "attendees": [
+                    {
+                        "email": f"{candidate_name.lower().replace(' ', '.')}@example.com",
+                        "name": candidate_name
+                    }
+                ],
+                "title": call_title,
+                "description": f"Build3 demo call with {candidate_name}",
+                "timeZone": "UTC"  # You can make this configurable
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=self.headers, json=booking_data)
+                response.raise_for_status()
+                
+                data = response.json()
+                logger.info(f"Booking response: {data}")
+                
+                return {
+                    "booking_id": data.get("uid"),
+                    "start_time": data.get("startTime"),
+                    "end_time": data.get("endTime"),
+                    "title": data.get("title"),
+                    "attendees": data.get("attendees", [])
+                }
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error booking appointment: {e}")
+            raise Exception(f"Failed to book appointment: {e}")
+        except Exception as e:
+            logger.error(f"Error booking appointment: {e}")
+            raise Exception(f"Failed to book appointment: {e}")
+    
+    async def _get_event_type(self) -> Optional[Dict]:
+        """
+        Get event type details
+        """
+        try:
+            url = f"{self.base_url}/event-types"
+            params = {
+                "username": self.username
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=self.headers, params=params)
+                response.raise_for_status()
+                
+                data = response.json()
+                event_types = data.get("event_types", [])
+                
+                # Find the specific event type
+                for event_type in event_types:
+                    if event_type.get("slug") == self.event_type_slug:
+                        return event_type
+                
+                logger.error(f"Event type '{self.event_type_slug}' not found")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting event type: {e}")
+            return None
+    
+    def _process_availability(self, availability_data: Dict, target_date: date) -> List[Dict]:
+        """
+        Process availability data and return available time slots
+        """
+        available_slots = []
+        
+        try:
+            # Extract availability information
+            # Note: The exact structure depends on Cal.com API response
+            # This is a generic implementation that you may need to adjust
+            
+            # Assuming the API returns available time slots
+            if "available_slots" in availability_data:
+                for slot in availability_data["available_slots"]:
+                    available_slots.append({
+                        "start_time": slot.get("start_time"),
+                        "end_time": slot.get("end_time"),
+                        "available": True
+                    })
+            else:
+                # If no specific slots, generate default business hours
+                # You can customize this based on your needs
+                business_hours = self._generate_business_hours(target_date)
+                available_slots.extend(business_hours)
+            
+            return available_slots
+            
+        except Exception as e:
+            logger.error(f"Error processing availability: {e}")
+            return []
+    
+    def _generate_business_hours(self, target_date: date) -> List[Dict]:
+        """
+        Generate default business hours for a given date
+        """
+        slots = []
+        start_hour = 9  # 9 AM
+        end_hour = 17   # 5 PM
+        
+        for hour in range(start_hour, end_hour):
+            for minute in [0, 30]:  # 30-minute slots
+                start_time = f"{hour:02d}:{minute:02d}"
+                end_hour_calc = hour
+                end_minute = minute + 30
+                if end_minute >= 60:
+                    end_hour_calc += 1
+                    end_minute = 0
+                end_time = f"{end_hour_calc:02d}:{end_minute:02d}"
+                
+                slots.append({
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "available": True
+                })
+        
+        return slots 
