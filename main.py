@@ -188,8 +188,8 @@ async def global_exception_handler(request, exc):
 
 if __name__ == "__main__":
     import uvicorn
-    # Use Railway's PORT environment variable or default to 8000
-    port = int(os.getenv("PORT", 8000))
+    # Use Railway's PORT environment variable - no fallback
+    port = int(os.getenv("PORT"))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
