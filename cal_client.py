@@ -132,14 +132,9 @@ class CalClient:
             if not event_type:
                 raise Exception("Failed to get event type details")
             
-            # Create booking
-            if event_type.get("teamId"):
-                # Use team booking endpoint for team events
-                url = f"{self.base_url}/teams/{self.team_id}/bookings"
-                params = {"apiKey": self.api_key}
-            else:
-                url = f"{self.base_url}/users/{user_id}/bookings"
-                params = {"apiKey": self.api_key}
+            # Create booking - always use user endpoint for bookings
+            url = f"{self.base_url}/users/{user_id}/bookings"
+            params = {"apiKey": self.api_key}
             
             # Parse time and create datetime
             time_obj = datetime.strptime(appointment_time, "%H:%M").time()
@@ -151,6 +146,7 @@ class CalClient:
             
             # Updated booking data structure based on Cal.com API docs
             booking_data = {
+                "eventTypeId": event_type["id"],
                 "start": start_datetime.isoformat(),
                 "end": end_datetime.isoformat(),
                 "attendees": [
@@ -163,12 +159,6 @@ class CalClient:
                 "description": f"Build3 demo call with {candidate_name}",
                 "timeZone": "UTC"
             }
-            
-            # Add eventTypeId to URL params for team events
-            if event_type.get("teamId"):
-                params["eventTypeId"] = event_type["id"]
-            else:
-                params["eventTypeId"] = event_type["id"]
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, params=params, json=booking_data)
