@@ -135,7 +135,7 @@ class CalClient:
             # Create booking
             if event_type.get("teamId"):
                 # Use team booking endpoint for team events
-                url = f"{self.base_url}/bookings"
+                url = f"{self.base_url}/teams/{self.team_id}/bookings"
                 params = {"apiKey": self.api_key}
             else:
                 url = f"{self.base_url}/users/{user_id}/bookings"
@@ -149,8 +149,8 @@ class CalClient:
             # Create call title
             call_title = f"Build3<> {candidate_name}"
             
+            # Updated booking data structure based on Cal.com API docs
             booking_data = {
-                "eventTypeId": event_type["id"],
                 "start": start_datetime.isoformat(),
                 "end": end_datetime.isoformat(),
                 "attendees": [
@@ -163,6 +163,12 @@ class CalClient:
                 "description": f"Build3 demo call with {candidate_name}",
                 "timeZone": "UTC"
             }
+            
+            # Add eventTypeId to URL params for team events
+            if event_type.get("teamId"):
+                params["eventTypeId"] = event_type["id"]
+            else:
+                params["eventTypeId"] = event_type["id"]
             
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, params=params, json=booking_data)
@@ -181,6 +187,13 @@ class CalClient:
                 
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error booking appointment: {e}")
+            # Log the response body for debugging
+            if hasattr(e, 'response') and e.response:
+                try:
+                    error_body = e.response.json()
+                    logger.error(f"Cal.com API error response: {error_body}")
+                except:
+                    logger.error(f"Cal.com API error response: {e.response.text}")
             raise Exception(f"Failed to book appointment: {e}")
         except Exception as e:
             logger.error(f"Error booking appointment: {e}")
