@@ -132,8 +132,8 @@ class CalClient:
             if not event_type:
                 raise Exception("Failed to get event type details")
             
-            # Create booking - always use user endpoint for bookings
-            url = f"{self.base_url}/users/{user_id}/bookings"
+            # Create booking - use the main bookings endpoint
+            url = f"{self.base_url}/bookings"
             params = {"apiKey": self.api_key}
             
             # Parse time and create datetime
