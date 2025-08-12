@@ -157,7 +157,9 @@ class CalClient:
                 ],
                 "title": call_title,
                 "description": f"Build3 demo call with {candidate_name}",
-                "timeZone": "UTC"
+                "timeZone": "UTC",
+                "language": "en",
+                "metadata": {}
             }
             
             async with httpx.AsyncClient() as client:
