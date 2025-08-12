@@ -160,7 +160,10 @@ class CalClient:
                 "timeZone": "UTC",
                 "language": "en",
                 "metadata": {},
-                "responses": {}
+                "responses": {
+                    "email": f"{candidate_name.lower().replace(' ', '.')}@example.com",
+                    "name": candidate_name
+                }
             }
             
             async with httpx.AsyncClient() as client:
