@@ -134,10 +134,18 @@ class CalClient:
             candidate_name = self._derive_name_from_email(email_id)
             
             # Create booking data with precise duration matching event type
-            start_time = f"{target_date}T{time}:00"
-            # Calculate end time based on event type's actual length
+            # Parse start time and calculate end time using datetime and timedelta
+            from datetime import datetime, timedelta
+            
+            # Combine date and time, assuming time is in HH:MM format
+            start_datetime_str = f"{target_date}T{time}:00"
+            start_dt = datetime.fromisoformat(start_datetime_str)
+            
             event_length_minutes = event_type.get("length", 30)
-            end_time = f"{target_date}T{time}:{event_length_minutes:02d}"
+            end_dt = start_dt + timedelta(minutes=event_length_minutes)
+            
+            start_time = start_dt.strftime("%Y-%m-%dT%H:%M")  # Format as YYYY-MM-DDTHH:MM
+            end_time = end_dt.strftime("%Y-%m-%dT%H:%M")      # Format as YYYY-MM-DDTHH:MM
             
             # Log the exact data being sent for debugging
             logger.info(f"Event type details: {event_type}")
