@@ -146,8 +146,8 @@ async def book_appointment(request: BookAppointmentRequest):
         
         # Book appointment using Cal.com client
         booking_result = await cal_client.book_appointment(
-            appointment_date=request.target_date,
-            appointment_time=request.time,
+            target_date=request.target_date,
+            time=request.time,
             email_id=request.email_id
         )
         
