@@ -119,48 +119,31 @@ class CalClient:
             logger.error(f"Error checking availability: {e}")
             raise Exception(f"Failed to check availability: {e}")
     
-    async def book_appointment(self, appointment_date: date, appointment_time: str, email_id: str) -> Dict:
+    async def book_appointment(self, target_date: str, time: str, email_id: str) -> dict:
         """Book an appointment using Cal.com API"""
         try:
-            # Get user ID first
+            # Get user ID for the username
             user_id = await self._get_user_id()
-            if not user_id:
-                raise Exception("Failed to get user ID")
             
             # Get event type details
-            event_type = await self._get_event_type(user_id)
+            event_type = await self._get_event_type()
             if not event_type:
-                raise Exception("Failed to get event type details")
+                raise Exception("Event type not found")
             
-            # Create booking - use the main bookings endpoint
-            url = f"{self.base_url}/bookings"
-            params = {"apiKey": self.api_key}
+            # Derive candidate name from email
+            candidate_name = self._derive_name_from_email(email_id)
             
-            # Parse time and create datetime
-            time_obj = datetime.strptime(appointment_time, "%H:%M").time()
-            start_datetime = datetime.combine(appointment_date, time_obj)
-            end_datetime = start_datetime + timedelta(minutes=settings.default_slot_duration_minutes)
-            
-            # Extract name from email (remove domain part)
-            candidate_name = email_id.split('@')[0].replace('.', ' ').title()
-            
-            # Create call title
-            call_title = f"Build3<> {candidate_name}"
-            
-            # Updated booking data structure based on Cal.com API docs
+            # Create booking data
             booking_data = {
                 "eventTypeId": event_type["id"],
-                "start": start_datetime.isoformat(),
-                "end": end_datetime.isoformat(),
+                "start": f"{target_date}T{time}:00.000Z",
+                "end": f"{target_date}T{time}:30.000Z",  # 30-minute slot
                 "attendees": [
                     {
                         "email": email_id,
                         "name": candidate_name
                     }
                 ],
-                "title": call_title,
-                "description": f"Build3 demo call with {candidate_name}",
-                "timeZone": "UTC",
                 "language": "en",
                 "metadata": {},
                 "responses": {
@@ -169,33 +152,68 @@ class CalClient:
                 }
             }
             
+            # Make booking request
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, params=params, json=booking_data)
-                response.raise_for_status()
+                response = await client.post(
+                    f"{self.base_url}/bookings",
+                    params={"apiKey": self.api_key},
+                    json=booking_data,
+                    timeout=30.0
+                )
                 
-                data = response.json()
-                logger.info(f"Booking response: {data}")
-                
-                return {
-                    "booking_id": data.get("uid"),
-                    "start_time": data.get("startTime"),
-                    "end_time": data.get("endTime"),
-                    "title": data.get("title"),
-                    "attendees": data.get("attendees", [])
-                }
-                
+                if response.status_code == 200:
+                    booking_info = response.json()
+                    return {
+                        "success": True,
+                        "booking_id": booking_info.get("uid", "unknown"),
+                        "message": "Appointment booked successfully",
+                        "appointment_details": {
+                            "booking_id": booking_info.get("uid", "unknown"),
+                            "start_time": f"{target_date}T{time}:00Z",
+                            "end_time": f"{target_date}T{time}:30Z",
+                            "title": f"Build3<> {candidate_name}",
+                            "attendees": [{"email": email_id, "name": candidate_name}]
+                        }
+                    }
+                else:
+                    error_data = response.json()
+                    error_message = error_data.get("message", "Unknown error")
+                    
+                    # Handle specific Cal.com error cases
+                    if error_message == "no_available_users_found_error":
+                        raise Exception(
+                            "No team members available for this time slot. "
+                            "Please check team member availability or contact your administrator."
+                        )
+                    elif error_message == "no_available_users_found_error":
+                        raise Exception(
+                            "No team members are assigned to this event type. "
+                            "Please contact your administrator to assign team members."
+                        )
+                    else:
+                        raise Exception(f"Cal.com API error: {error_message}")
+                        
         except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error booking appointment: {e}")
-            # Log the response body for debugging
-            if hasattr(e, 'response') and e.response:
-                try:
-                    error_body = e.response.json()
-                    logger.error(f"Cal.com API error response: {error_body}")
-                except:
-                    logger.error(f"Cal.com API error response: {e.response.text}")
-            raise Exception(f"Failed to book appointment: {e}")
+            # Log detailed error information
+            error_body = ""
+            try:
+                error_body = e.response.json()
+                self.logger.error(f"Cal.com API error response: {error_body}")
+            except:
+                pass
+            
+            if e.response.status_code == 400:
+                error_message = error_body.get("message", "Bad Request")
+                if "no_available_users_found_error" in error_message:
+                    raise Exception(
+                        "No team members available for this time slot. "
+                        "Please check team member availability or contact your administrator."
+                    )
+                else:
+                    raise Exception(f"Cal.com API error: {error_message}")
+            else:
+                raise Exception(f"HTTP error booking appointment: {e}")
         except Exception as e:
-            logger.error(f"Error booking appointment: {e}")
             raise Exception(f"Failed to book appointment: {e}")
     
     async def _get_event_type(self, user_id: int) -> Optional[Dict]:
@@ -305,3 +323,10 @@ class CalClient:
                 })
         
         return slots 
+
+    def _derive_name_from_email(self, email_id: str) -> str:
+        """Derive a human-readable name from email address"""
+        # Extract the part before @ and replace dots with spaces
+        name_part = email_id.split('@')[0]
+        # Replace dots with spaces and capitalize each word
+        return name_part.replace('.', ' ').title() 
