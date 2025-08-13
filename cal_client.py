@@ -133,11 +133,15 @@ class CalClient:
             # Derive candidate name from email
             candidate_name = self._derive_name_from_email(email_id)
             
-            # Create booking data
+            # Create booking data with precise duration matching event type
+            start_time = f"{target_date}T{time}:00"
+            # Calculate end time based on event type length (30 minutes)
+            end_time = f"{target_date}T{time}:30"
+            
             booking_data = {
                 "eventTypeId": event_type["id"],
-                "start": f"{target_date}T{time}:00.000Z",
-                "end": f"{target_date}T{time}:30.000Z",  # 30-minute slot
+                "start": start_time,
+                "end": end_time,
                 "timeZone": "Asia/Kolkata",  # IST (UTC+5:30) - Required by Cal.com API
                 "attendees": [
                     {
