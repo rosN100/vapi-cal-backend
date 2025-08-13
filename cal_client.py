@@ -138,6 +138,7 @@ class CalClient:
                 "eventTypeId": event_type["id"],
                 "start": f"{target_date}T{time}:00.000Z",
                 "end": f"{target_date}T{time}:30.000Z",  # 30-minute slot
+                "timeZone": "UTC",  # Required by Cal.com API
                 "attendees": [
                     {
                         "email": email_id,
