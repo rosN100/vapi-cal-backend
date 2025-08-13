@@ -119,7 +119,7 @@ class CalClient:
             logger.error(f"Error checking availability: {e}")
             raise Exception(f"Failed to check availability: {e}")
     
-    async def book_appointment(self, appointment_date: date, appointment_time: str, candidate_name: str) -> Dict:
+    async def book_appointment(self, appointment_date: date, appointment_time: str, email_id: str) -> Dict:
         """Book an appointment using Cal.com API"""
         try:
             # Get user ID first
@@ -141,6 +141,9 @@ class CalClient:
             start_datetime = datetime.combine(appointment_date, time_obj)
             end_datetime = start_datetime + timedelta(minutes=settings.default_slot_duration_minutes)
             
+            # Extract name from email (remove domain part)
+            candidate_name = email_id.split('@')[0].replace('.', ' ').title()
+            
             # Create call title
             call_title = f"Build3<> {candidate_name}"
             
@@ -151,7 +154,7 @@ class CalClient:
                 "end": end_datetime.isoformat(),
                 "attendees": [
                     {
-                        "email": f"{candidate_name.lower().replace(' ', '.')}@example.com",
+                        "email": email_id,
                         "name": candidate_name
                     }
                 ],
@@ -161,7 +164,7 @@ class CalClient:
                 "language": "en",
                 "metadata": {},
                 "responses": {
-                    "email": f"{candidate_name.lower().replace(' ', '.')}@example.com",
+                    "email": email_id,
                     "name": candidate_name
                 }
             }

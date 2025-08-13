@@ -120,13 +120,13 @@ async def book_appointment(request: BookAppointmentRequest):
     Webhook endpoint for Vapi AI agent to book an appointment
     
     Args:
-        request: Contains the target_date, time, and candidate name
+        request: Contains the target_date, time, and email_id
         
     Returns:
         Confirmation of the booking with details
     """
     try:
-        logger.info(f"Booking appointment for {request.candidate_name} on {request.target_date} at {request.time}")
+        logger.info(f"Booking appointment for {request.email_id} on {request.target_date} at {request.time}")
         
         # Validate date is not in the past
         if request.target_date < date.today():
@@ -141,20 +141,20 @@ async def book_appointment(request: BookAppointmentRequest):
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid time format. Please use HH:MM format (e.g., 14:30)"
+                detail="Invalid time format. Use HH:MM format (e.g., 14:00)"
             )
         
         # Book appointment using Cal.com client
         booking_result = await cal_client.book_appointment(
             appointment_date=request.target_date,
             appointment_time=request.time,
-            candidate_name=request.candidate_name
+            email_id=request.email_id
         )
         
         return BookAppointmentResponse(
             success=True,
             booking_id=booking_result.get("booking_id"),
-            message=f"Successfully booked appointment for {request.candidate_name}",
+            message="Appointment booked successfully",
             appointment_details=booking_result
         )
         

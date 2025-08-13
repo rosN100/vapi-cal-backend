@@ -21,7 +21,7 @@ class CheckAvailabilityResponse(BaseModel):
 class BookAppointmentRequest(BaseModel):
     target_date: date_type = Field(..., description="Date for the appointment (YYYY-MM-DD)")
     time: str = Field(..., description="Start time in HH:MM format")
-    candidate_name: str = Field(..., description="Name of the candidate")
+    email_id: str = Field(..., description="Email address of the candidate")
 
 class BookAppointmentResponse(BaseModel):
     success: bool = Field(..., description="Whether the booking was successful")
