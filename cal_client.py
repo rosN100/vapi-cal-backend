@@ -126,7 +126,7 @@ class CalClient:
             user_id = await self._get_user_id()
             
             # Get event type details
-            event_type = await self._get_event_type()
+            event_type = await self._get_event_type(user_id)
             if not event_type:
                 raise Exception("Event type not found")
             
