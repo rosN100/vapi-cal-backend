@@ -135,13 +135,19 @@ class CalClient:
             
             # Create booking data with precise duration matching event type
             start_time = f"{target_date}T{time}:00"
-            # Calculate end time based on event type length (30 minutes)
-            end_time = f"{target_date}T{time}:30"
+            # Calculate end time based on event type's actual length
+            event_length_minutes = event_type.get("length", 30)
+            end_time = f"{target_date}T{time}:{event_length_minutes:02d}"
+            
+            # Log the exact data being sent for debugging
+            logger.info(f"Event type details: {event_type}")
+            logger.info(f"Creating booking with start: {start_time}, end: {end_time}")
             
             booking_data = {
                 "eventTypeId": event_type["id"],
                 "start": start_time,
                 "end": end_time,
+                "duration": event_length_minutes,  # Add explicit duration field
                 "timeZone": "Asia/Kolkata",  # IST (UTC+5:30) - Required by Cal.com API
                 "attendees": [
                     {
@@ -156,6 +162,9 @@ class CalClient:
                     "name": candidate_name
                 }
             }
+            
+            # Log the complete booking data
+            logger.info(f"Complete booking data: {booking_data}")
             
             # Make booking request
             async with httpx.AsyncClient() as client:
