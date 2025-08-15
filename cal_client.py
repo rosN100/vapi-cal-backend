@@ -77,8 +77,8 @@ class CalClient:
                     "apiKey": self.api_key,
                     "eventTypeId": event_type["id"],  # Required: numeric event type ID for precise event identification
                     "dateFrom": start_date.isoformat(),
-                    "dateTo": end_date.isoformat(),
-                    "duration": settings.default_slot_duration_minutes
+                    "dateTo": end_date.isoformat()
+                    # Removed duration parameter - event type already defines its length (30 minutes)
                 }
             else:
                 url = f"{self.base_url}/users/{user_id}/availability"
