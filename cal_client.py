@@ -70,9 +70,9 @@ class CalClient:
             start_date = target_date
             end_date = target_date + timedelta(days=time_range_days)
             
-            # Use the /slots endpoint for event-specific availability (correct method per Cal.com API docs)
+            # Use team-specific availability endpoint for team events
             if event_type.get("teamId"):
-                url = f"{self.base_url}/slots"
+                url = f"{self.base_url}/teams/{self.team_id}/availability"
                 params = {
                     "apiKey": self.api_key,
                     "eventTypeId": event_type["id"],  # Required: numeric event type ID for precise event identification
