@@ -177,17 +177,12 @@ class CalClient:
             # Log the complete booking data
             logger.info(f"Complete booking data: {booking_data}")
             
-            # Make booking request using Cal.com API v2
+            # Make booking request using Cal.com API v1 (v2 doesn't have /bookings endpoint)
             async with httpx.AsyncClient() as client:
-                # Add required headers for Cal.com API v2
-                headers = {
-                    "cal-api-version": "2024-09-04"
-                }
-                # For v2 API, try using apiKey as query parameter first
+                # Use v1 /bookings endpoint with proper parameters for team events
                 params = {"apiKey": self.api_key}
                 response = await client.post(
-                    f"{self.base_url.replace('/v1/', '/v2/')}/bookings",
-                    headers=headers,
+                    f"{self.base_url}/bookings",
                     params=params,
                     json=booking_data,
                     timeout=30.0
