@@ -70,17 +70,15 @@ class CalClient:
             start_date = target_date
             end_date = target_date  # Same day only
             
-            # Use team-specific availability endpoint for team events
+            # Use Cal.com API v2 /slots endpoint for team events (correct method per official docs)
             if event_type.get("teamId"):
-                url = f"{self.base_url}/teams/{self.team_id}/availability"
+                url = f"{self.base_url.replace('/v1/', '/v2/')}/slots"  # Use v2 API
                 params = {
-                    "apiKey": self.api_key,
-                    "eventTypeId": event_type["id"],  # Required: numeric event type ID for precise event identification
-                    "dateFrom": start_date.isoformat(),
-                    "dateTo": end_date.isoformat(),
-                    "startTime": "09:00",  # Limit to your actual working hours (9 AM)
-                    "endTime": "14:00"     # Limit to your actual working hours (2 PM)
-                    # Removed duration parameter - event type already defines its length (30 minutes)
+                    "eventTypeSlug": self.event_type_slug,  # "build3-demo"
+                    "teamSlug": "soraaya-team",             # From your Cal.com team slug
+                    "start": start_date.isoformat(),         # ISO8601 format
+                    "end": end_date.isoformat(),             # ISO8601 format
+                    "timeZone": "Asia/Kolkata"               # Your timezone
                 }
             else:
                 url = f"{self.base_url}/users/{user_id}/availability"
@@ -93,7 +91,12 @@ class CalClient:
                 }
             
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, params=params)
+                # Add required headers for Cal.com API v2
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "cal-api-version": "2024-09-04"
+                }
+                response = await client.get(url, params=params, headers=headers)
                 response.raise_for_status()
                 
                 data = response.json()
