@@ -70,13 +70,12 @@ class CalClient:
             start_date = target_date
             end_date = target_date + timedelta(days=time_range_days)
             
-            # Use team availability endpoint for team events
+            # Use event-specific availability endpoint for team events
             if event_type.get("teamId"):
                 url = f"{self.base_url}/availability"
                 params = {
                     "apiKey": self.api_key,
-                    "teamId": self.team_id,
-                    "eventTypeSlug": self.event_type_slug,
+                    "eventTypeId": event_type["id"],  # Use eventTypeId for specific event availability
                     "dateFrom": start_date.isoformat(),
                     "dateTo": end_date.isoformat(),
                     "duration": settings.default_slot_duration_minutes
