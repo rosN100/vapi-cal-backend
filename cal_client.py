@@ -66,9 +66,9 @@ class CalClient:
             if not event_type:
                 raise Exception("Failed to get event type details")
             
-            # Get availability for the date range
+            # Get availability for the specific date only (not date range)
             start_date = target_date
-            end_date = target_date + timedelta(days=time_range_days)
+            end_date = target_date  # Same day only
             
             # Use team-specific availability endpoint for team events
             if event_type.get("teamId"):
@@ -77,7 +77,9 @@ class CalClient:
                     "apiKey": self.api_key,
                     "eventTypeId": event_type["id"],  # Required: numeric event type ID for precise event identification
                     "dateFrom": start_date.isoformat(),
-                    "dateTo": end_date.isoformat()
+                    "dateTo": end_date.isoformat(),
+                    "startTime": "09:00",  # Limit to your actual working hours (9 AM)
+                    "endTime": "14:00"     # Limit to your actual working hours (2 PM)
                     # Removed duration parameter - event type already defines its length (30 minutes)
                 }
             else:
