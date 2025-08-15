@@ -181,12 +181,14 @@ class CalClient:
             async with httpx.AsyncClient() as client:
                 # Add required headers for Cal.com API v2
                 headers = {
-                    "Authorization": f"Bearer {self.api_key}",
                     "cal-api-version": "2024-09-04"
                 }
+                # For v2 API, try using apiKey as query parameter first
+                params = {"apiKey": self.api_key}
                 response = await client.post(
                     f"{self.base_url.replace('/v1/', '/v2/')}/bookings",
                     headers=headers,
+                    params=params,
                     json=booking_data,
                     timeout=30.0
                 )
