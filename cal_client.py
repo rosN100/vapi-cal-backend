@@ -74,11 +74,10 @@ class CalClient:
             if event_type.get("teamId"):
                 url = f"{self.base_url.replace('/v1/', '/v2/')}/slots"  # Use v2 API
                 params = {
-                    "eventTypeSlug": self.event_type_slug,  # "build3-demo"
-                    "teamSlug": "soraaya-team",             # From your Cal.com team slug
-                    "start": start_date.isoformat(),         # ISO8601 format
-                    "end": end_date.isoformat(),             # ISO8601 format
-                    "timeZone": "Asia/Kolkata"               # Your timezone
+                    "eventTypeId": event_type["id"],         # Use numeric event type ID (3042193)
+                    "start": start_date.isoformat(),          # ISO8601 format
+                    "end": end_date.isoformat(),              # ISO8601 format
+                    "timeZone": "Asia/Kolkata"                # Your timezone
                 }
             else:
                 url = f"{self.base_url}/users/{user_id}/availability"
@@ -178,11 +177,16 @@ class CalClient:
             # Log the complete booking data
             logger.info(f"Complete booking data: {booking_data}")
             
-            # Make booking request
+            # Make booking request using Cal.com API v2
             async with httpx.AsyncClient() as client:
+                # Add required headers for Cal.com API v2
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "cal-api-version": "2024-09-04"
+                }
                 response = await client.post(
-                    f"{self.base_url}/bookings",
-                    params={"apiKey": self.api_key},
+                    f"{self.base_url.replace('/v1/', '/v2/')}/bookings",
+                    headers=headers,
                     json=booking_data,
                     timeout=30.0
                 )
