@@ -74,10 +74,11 @@ class CalClient:
             if event_type.get("teamId"):
                 url = f"{self.base_url.replace('/v1/', '/v2/')}/slots"  # Use v2 API
                 params = {
-                    "eventTypeId": event_type["id"],         # Use numeric event type ID (3042193)
-                    "start": start_date.isoformat(),          # ISO8601 format
-                    "end": end_date.isoformat(),              # ISO8601 format
-                    "timeZone": "Asia/Kolkata"                # Your timezone
+                    "eventTypeSlug": event_type.get("slug", "build3-demo"),  # Use event type slug, fallback to build3-demo
+                    "teamSlug": "soraaya-team",                              # Your team slug
+                    "start": start_date.isoformat(),                          # ISO8601 format
+                    "end": end_date.isoformat(),                              # ISO8601 format
+                    "timeZone": "Asia/Kolkata"                                # Your timezone
                 }
             else:
                 url = f"{self.base_url}/users/{user_id}/availability"
