@@ -26,12 +26,13 @@ class CalClient:
             return self.user_id
             
         try:
-            url = f"{self.base_url}/users"
+            # Use v2 API endpoint /me to get current user info
+            url = f"{self.base_url}/me"
             logger.info(f"DEBUG: Getting user ID from base_url: {self.base_url}")
             logger.info(f"DEBUG: Constructed users URL: {url}")
             # Use v2 API headers instead of v1 params
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
+                "Authorization": f"Bearer cal_{self.api_key}",
                 "Content-Type": "application/json"
             }
             
@@ -42,14 +43,13 @@ class CalClient:
                 data = response.json()
                 logger.info(f"Users response: {data}")
                 
-                # Find user by username
-                for user in data.get("users", []):
-                    if user.get("username") == self.username:
-                        self.user_id = user.get("id")
-                        logger.info(f"Found user ID: {self.user_id} for username: {self.username}")
-                        return self.user_id
+                # In v2 API, /me returns the current user directly
+                if data.get("id"):
+                    self.user_id = data.get("id")
+                    logger.info(f"Found user ID: {self.user_id} for username: {self.username}")
+                    return self.user_id
                 
-                logger.error(f"User '{self.username}' not found")
+                logger.error(f"User ID not found in response")
                 return None
                 
         except Exception as e:
@@ -80,7 +80,7 @@ class CalClient:
             if event_type.get("teamId"):
                 url = f"{self.base_url}/slots"  # Use v2 API
                 logger.info(f"DEBUG: Using base_url: {self.base_url}")
-                logger.info(f"DEBUG: Constructed URL: {url}")
+                logger.info(f"DEBUG: Constructed slots URL: {url}")
                 params = {
                     "eventTypeSlug": event_type.get("slug", "build3-demo"),  # Use event type slug, fallback to build3-demo
                     "teamSlug": "soraaya-team",                              # Your team slug
@@ -91,7 +91,7 @@ class CalClient:
             else:
                 url = f"{self.base_url}/slots"  # Use v2 API for personal events too
                 logger.info(f"DEBUG: Using base_url: {self.base_url}")
-                logger.info(f"DEBUG: Constructed URL: {url}")
+                logger.info(f"DEBUG: Constructed slots URL: {url}")
                 params = {
                     "eventTypeSlug": event_type.get("slug", "build3-demo"),
                     "username": self.username,
@@ -103,7 +103,7 @@ class CalClient:
             async with httpx.AsyncClient() as client:
                 # Add required headers for Cal.com API v2
                 headers = {
-                    "Authorization": f"Bearer {self.api_key}",
+                    "Authorization": f"Bearer cal_{self.api_key}",
                     "cal-api-version": "2024-09-04"
                 }
                 response = await client.get(url, params=params, headers=headers)
@@ -196,7 +196,7 @@ class CalClient:
                 # Use v2 /bookings endpoint with proper parameters
                 headers = {
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer {self.api_key}",
+                    "Authorization": f"Bearer cal_{self.api_key}",
                     "cal-api-version": "2024-08-13"
                 }
                 response = await client.post(
@@ -265,49 +265,31 @@ class CalClient:
     async def _get_event_type(self, user_id: int) -> Optional[Dict]:
         """Get event type details - handle both personal and team events"""
         try:
-            # First try team events using team ID
-            team_url = f"{self.base_url}/teams/{self.team_id}/event-types"
-            logger.info(f"DEBUG: Getting team event types from base_url: {self.base_url}")
-            logger.info(f"DEBUG: Constructed team URL: {team_url}")
-            # Use v2 API headers instead of v1 params
-            team_headers = {
-                "Authorization": f"Bearer {self.api_key}",
+            # Use v2 API endpoint /event-types to get all event types
+            event_types_url = f"{self.base_url}/event-types"
+            logger.info(f"DEBUG: Getting event types from base_url: {self.base_url}")
+            logger.info(f"DEBUG: Constructed event types URL: {event_types_url}")
+            
+            # Use v2 API headers
+            headers = {
+                "Authorization": f"Bearer cal_{self.api_key}",
                 "Content-Type": "application/json"
             }
             
             async with httpx.AsyncClient() as client:
-                response = await client.get(team_url, headers=team_headers)
-                if response.status_code == 200:
-                    data = response.json()
-                    event_types = data.get("event_types", [])
-                    
-                    # Find the build3-demo event type
-                    for event_type in event_types:
-                        if event_type.get("slug") == self.event_type_slug:
-                            logger.info(f"Found team event type: {event_type}")
-                            return event_type
-                
-                # Fallback to personal events if team event not found
-                personal_url = f"{self.base_url}/users/{user_id}/event-types"
-                logger.info(f"DEBUG: Getting personal event types from base_url: {self.base_url}")
-                logger.info(f"DEBUG: Constructed personal URL: {personal_url}")
-                # Use v2 API headers instead of v1 params
-                personal_headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                
-                response = await client.get(personal_url, headers=personal_headers)
+                response = await client.get(event_types_url, headers=headers)
                 response.raise_for_status()
                 
                 data = response.json()
-                event_types = data.get("event_types", [])
+                event_types = data.get("data", {}).get("event_types", [])
                 
+                # Find the build3-demo event type
                 for event_type in event_types:
                     if event_type.get("slug") == self.event_type_slug:
+                        logger.info(f"Found event type: {event_type}")
                         return event_type
                 
-                logger.error(f"Event type '{self.event_type_slug}' not found in personal or team events")
+                logger.error(f"Event type '{self.event_type_slug}' not found")
                 return None
                 
         except Exception as e:
