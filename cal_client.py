@@ -274,6 +274,7 @@ class CalClient:
             event_types_url = f"{self.base_url}/event-types"
             logger.info(f"DEBUG: Getting event types from base_url: {self.base_url}")
             logger.info(f"DEBUG: Constructed event types URL: {event_types_url}")
+            logger.info(f"DEBUG: Looking for event type slug: {self.event_type_slug}")
             
             # Use v2 API headers
             headers = {
@@ -286,10 +287,27 @@ class CalClient:
                 response.raise_for_status()
                 
                 data = response.json()
-                event_types = data.get("data", {}).get("event_types", [])
+                logger.info(f"DEBUG: Full event types response: {data}")
+                
+                # Try different response structures
+                event_types = []
+                if data.get("data", {}).get("event_types"):
+                    event_types = data.get("data", {}).get("event_types", [])
+                    logger.info(f"DEBUG: Found event_types in data.data.event_types: {len(event_types)} items")
+                elif data.get("event_types"):
+                    event_types = data.get("event_types", [])
+                    logger.info(f"DEBUG: Found event_types in data.event_types: {len(event_types)} items")
+                elif data.get("data"):
+                    event_types = data.get("data", [])
+                    logger.info(f"DEBUG: Found event_types in data.data: {len(event_types)} items")
+                else:
+                    logger.info(f"DEBUG: No event_types found in response structure")
+                
+                logger.info(f"DEBUG: All event types: {event_types}")
                 
                 # Find the build3-demo event type
                 for event_type in event_types:
+                    logger.info(f"DEBUG: Checking event type: {event_type.get('slug')} vs {self.event_type_slug}")
                     if event_type.get("slug") == self.event_type_slug:
                         logger.info(f"Found event type: {event_type}")
                         return event_type
