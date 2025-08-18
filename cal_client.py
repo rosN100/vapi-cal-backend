@@ -27,10 +27,16 @@ class CalClient:
             
         try:
             url = f"{self.base_url}/users"
-            params = {"apiKey": self.api_key}
+            logger.info(f"DEBUG: Getting user ID from base_url: {self.base_url}")
+            logger.info(f"DEBUG: Constructed users URL: {url}")
+            # Use v2 API headers instead of v1 params
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
             
             async with httpx.AsyncClient() as client:
-                response = await client.get(url, params=params)
+                response = await client.get(url, headers=headers)
                 response.raise_for_status()
                 
                 data = response.json()
@@ -73,6 +79,8 @@ class CalClient:
             # Use Cal.com API v2 /slots endpoint
             if event_type.get("teamId"):
                 url = f"{self.base_url}/slots"  # Use v2 API
+                logger.info(f"DEBUG: Using base_url: {self.base_url}")
+                logger.info(f"DEBUG: Constructed URL: {url}")
                 params = {
                     "eventTypeSlug": event_type.get("slug", "build3-demo"),  # Use event type slug, fallback to build3-demo
                     "teamSlug": "soraaya-team",                              # Your team slug
@@ -82,6 +90,8 @@ class CalClient:
                 }
             else:
                 url = f"{self.base_url}/slots"  # Use v2 API for personal events too
+                logger.info(f"DEBUG: Using base_url: {self.base_url}")
+                logger.info(f"DEBUG: Constructed URL: {url}")
                 params = {
                     "eventTypeSlug": event_type.get("slug", "build3-demo"),
                     "username": self.username,
@@ -257,10 +267,16 @@ class CalClient:
         try:
             # First try team events using team ID
             team_url = f"{self.base_url}/teams/{self.team_id}/event-types"
-            team_params = {"apiKey": self.api_key}
+            logger.info(f"DEBUG: Getting team event types from base_url: {self.base_url}")
+            logger.info(f"DEBUG: Constructed team URL: {team_url}")
+            # Use v2 API headers instead of v1 params
+            team_headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
             
             async with httpx.AsyncClient() as client:
-                response = await client.get(team_url, params=team_params)
+                response = await client.get(team_url, headers=team_headers)
                 if response.status_code == 200:
                     data = response.json()
                     event_types = data.get("event_types", [])
@@ -273,9 +289,15 @@ class CalClient:
                 
                 # Fallback to personal events if team event not found
                 personal_url = f"{self.base_url}/users/{user_id}/event-types"
-                personal_params = {"apiKey": self.api_key}
+                logger.info(f"DEBUG: Getting personal event types from base_url: {self.base_url}")
+                logger.info(f"DEBUG: Constructed personal URL: {personal_url}")
+                # Use v2 API headers instead of v1 params
+                personal_headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                }
                 
-                response = await client.get(personal_url, params=personal_params)
+                response = await client.get(personal_url, headers=personal_headers)
                 response.raise_for_status()
                 
                 data = response.json()
