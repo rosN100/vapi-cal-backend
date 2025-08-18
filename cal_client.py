@@ -274,174 +274,77 @@ class CalClient:
             print(f"DEBUG: Starting _get_event_type for slug: {self.event_type_slug}")
             logger.info(f"DEBUG: Starting _get_event_type for slug: {self.event_type_slug}")
             
-            # Since build3-demo is a team event, let's try team endpoints first
-            logger.info(f"DEBUG: Looking for team event type: {self.event_type_slug}")
-            print(f"DEBUG: Looking for team event type: {self.event_type_slug}")
+            # The Cal.com v2 /event-types endpoint returns both personal and team event types
+            # Let's use this single endpoint instead of trying separate team endpoints
+            logger.info(f"DEBUG: Looking for event type: {self.event_type_slug}")
+            print(f"DEBUG: Looking for event type: {self.event_type_slug}")
             
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
             
-            # First, try to get teams for the current user
-            logger.info(f"DEBUG: Getting teams for current user...")
-            print(f"DEBUG: Getting teams for current user...")
-            teams_url = f"{self.base_url}/teams"
+            # Use the main event-types endpoint which returns both personal and team events
+            event_types_url = f"{self.base_url}/event-types"
+            print(f"DEBUG: Making request to: {event_types_url}")
+            logger.info(f"DEBUG: Making request to: {event_types_url}")
             
             try:
                 async with httpx.AsyncClient() as client:
-                    print(f"DEBUG: Making request to: {teams_url}")
-                    teams_response = await client.get(teams_url, headers=headers)
-                    print(f"DEBUG: Teams response status: {teams_response.status_code}")
+                    response = await client.get(event_types_url, headers=headers)
+                    print(f"DEBUG: Event types response status: {response.status_code}")
                     
-                    if teams_response.status_code == 200:
-                        teams_data = teams_response.json()
-                        print(f"DEBUG: Teams response data: {teams_data}")
-                        logger.info(f"DEBUG: Teams response: {teams_data}")
+                    if response.status_code == 200:
+                        data = response.json()
+                        print(f"DEBUG: Full event types response: {data}")
+                        logger.info(f"DEBUG: Full event types response: {data}")
                         
-                        # Look for soraaya team
-                        teams = teams_data.get("data", []) if teams_data.get("data") else teams_data.get("teams", [])
-                        print(f"DEBUG: Found teams: {teams}")
-                        logger.info(f"DEBUG: Found teams: {teams}")
+                        # Parse both personal and team event types from the response
+                        event_types = []
                         
-                        for team in teams:
-                            team_name = team.get("name", "").lower()
-                            team_slug = team.get("slug", "").lower()
-                            print(f"DEBUG: Checking team: {team_name} (slug: {team_slug})")
-                            logger.info(f"DEBUG: Checking team: {team_name} (slug: {team_slug})")
+                        # Get personal event types
+                        if data.get("data", {}).get("eventTypeGroups"):
+                            for group in data.get("data", {}).get("eventTypeGroups", []):
+                                if group.get("teamId") is None:  # Personal events
+                                    personal_events = group.get("eventTypes", [])
+                                    print(f"DEBUG: Found {len(personal_events)} personal event types")
+                                    event_types.extend(personal_events)
+                                else:  # Team events
+                                    team_events = group.get("eventTypes", [])
+                                    team_name = group.get("profile", {}).get("name", "Unknown Team")
+                                    print(f"DEBUG: Found {len(team_events)} team event types from {team_name}")
+                                    event_types.extend(team_events)
+                        
+                        print(f"DEBUG: Total event types found: {len(event_types)} items")
+                        logger.info(f"DEBUG: Total event types found: {len(event_types)} items")
+                        
+                        # Find the build3-demo event type
+                        for event_type in event_types:
+                            event_slug = event_type.get('slug', '')
+                            event_title = event_type.get('title', 'Unknown')
+                            team_id = event_type.get('teamId')
+                            event_type_info = f"{event_title} (slug: {event_slug}, teamId: {team_id})"
                             
-                            # Check if this is the soraaya team
-                            if "soraaya" in team_name or "soraaya" in team_slug:
-                                team_id = team.get("id")
-                                print(f"DEBUG: Found soraaya team with ID: {team_id}")
-                                logger.info(f"DEBUG: Found soraaya team with ID: {team_id}")
-                                
-                                # Try to get team event types using the correct v2 endpoint
-                                # Based on Cal.com v2 docs: /v2/teams/{teamId}/event-types
-                                team_event_types_url = f"{self.base_url}/teams/{team_id}/event-types"
-                                print(f"DEBUG: Trying team event types URL: {team_event_types_url}")
-                                logger.info(f"DEBUG: Trying team event types URL: {team_event_types_url}")
-                                
-                                team_event_types_response = await client.get(team_event_types_url, headers=headers)
-                                print(f"DEBUG: Team event types response status: {team_event_types_response.status_code}")
-                                
-                                if team_event_types_response.status_code == 200:
-                                    team_event_types_data = team_event_types_response.json()
-                                    print(f"DEBUG: Team event types response data: {team_event_types_data}")
-                                    logger.info(f"DEBUG: Team event types response: {team_event_types_data}")
-                                    
-                                    # Try different response structures
-                                    event_types = []
-                                    if team_event_types_data.get("data", {}).get("event_types"):
-                                        event_types = team_event_types_data.get("data", {}).get("event_types", [])
-                                    elif team_event_types_data.get("event_types"):
-                                        event_types = team_event_types_data.get("event_types", [])
-                                    elif team_event_types_data.get("data"):
-                                        event_types = team_event_types_data.get("data", [])
-                                    
-                                    print(f"DEBUG: Team event types found: {len(event_types)} items")
-                                    logger.info(f"DEBUG: Team event types found: {len(event_types)} items")
-                                    
-                                    # Find the build3-demo event type
-                                    for event_type in event_types:
-                                        event_slug = event_type.get('slug', '')
-                                        print(f"DEBUG: Checking team event type: {event_slug} vs {self.event_type_slug}")
-                                        logger.info(f"DEBUG: Checking team event type: {event_slug} vs {self.event_type_slug}")
-                                        if event_slug == self.event_type_slug:
-                                            print(f"Found team event type: {event_type}")
-                                            logger.info(f"Found team event type: {event_type}")
-                                            return event_type
-                                    
-                                    print(f"DEBUG: Event type '{self.event_type_slug}' not found in soraaya team")
-                                    logger.info(f"DEBUG: Event type '{self.event_type_slug}' not found in soraaya team")
-                                else:
-                                    print(f"DEBUG: Team event types request failed with status: {team_event_types_response.status_code}")
-                                    logger.info(f"DEBUG: Team event types request failed with status: {team_event_types_response.status_code}")
-                                
-                                break  # Found soraaya team, no need to check others
+                            print(f"DEBUG: Checking event type: {event_type_info}")
+                            logger.info(f"DEBUG: Checking event type: {event_type_info}")
+                            
+                            if event_slug == self.event_type_slug:
+                                print(f"Found event type: {event_type}")
+                                logger.info(f"Found event type: {event_type}")
+                                return event_type
+                        
+                        print(f"DEBUG: Event type '{self.event_type_slug}' not found in any event types")
+                        logger.info(f"DEBUG: Event type '{self.event_type_slug}' not found in any event types")
+                        
                     else:
-                        print(f"DEBUG: Teams request failed with status: {teams_response.status_code}")
-                        logger.info(f"DEBUG: Teams request failed with status: {teams_response.status_code}")
+                        print(f"DEBUG: Event types request failed with status: {response.status_code}")
+                        logger.info(f"DEBUG: Event types request failed with status: {response.status_code}")
                         
             except Exception as e:
-                print(f"DEBUG: Error getting teams: {e}")
-                logger.info(f"DEBUG: Error getting teams: {e}")
+                print(f"DEBUG: Error getting event types: {e}")
+                logger.info(f"DEBUG: Error getting event types: {e}")
             
-            print(f"DEBUG: Team approach failed, trying personal event types...")
-            logger.info(f"DEBUG: Team approach failed, trying personal event types...")
-            
-            # If team approach failed, fall back to personal event types
-            logger.info(f"DEBUG: Team approach failed, trying personal event types...")
-            
-            # Get user ID for personal endpoints
-            user_id = await self._get_user_id()
-            if not user_id:
-                raise Exception("Failed to get user ID")
-            
-            print(f"DEBUG: Got user ID: {user_id}")
-            logger.info(f"DEBUG: Got user ID: {user_id}")
-            
-            # Try multiple possible personal endpoint structures based on Cal.com v2 docs
-            possible_endpoints = [
-                f"{self.base_url}/event-types",  # Basic endpoint
-                f"{self.base_url}/users/{user_id}/event-types",  # User-specific
-                f"{self.base_url}/me/event-types",  # Current user
-                f"{self.base_url}/event-types?userId={user_id}"  # With query param
-            ]
-            
-            for endpoint_url in possible_endpoints:
-                print(f"DEBUG: Trying personal endpoint: {endpoint_url}")
-                logger.info(f"DEBUG: Trying personal endpoint: {endpoint_url}")
-                
-                try:
-                    async with httpx.AsyncClient() as client:
-                        response = await client.get(endpoint_url, headers=headers)
-                        
-                        if response.status_code == 200:
-                            print(f"DEBUG: SUCCESS with personal endpoint: {endpoint_url}")
-                            logger.info(f"DEBUG: SUCCESS with personal endpoint: {endpoint_url}")
-                            data = response.json()
-                            print(f"DEBUG: Full personal event types response: {data}")
-                            logger.info(f"DEBUG: Full personal event types response: {data}")
-                            
-                            # Try different response structures
-                            event_types = []
-                            if data.get("data", {}).get("event_types"):
-                                event_types = data.get("data", {}).get("event_types", [])
-                            elif data.get("event_types"):
-                                event_types = data.get("event_types", [])
-                            elif data.get("data"):
-                                event_types = data.get("data", [])
-                            
-                            print(f"DEBUG: Personal event types found: {len(event_types)} items")
-                            logger.info(f"DEBUG: Personal event types found: {len(event_types)} items")
-                            
-                            # Find the build3-demo event type
-                            for event_type in event_types:
-                                event_slug = event_type.get('slug', '')
-                                print(f"DEBUG: Checking personal event type: {event_slug} vs {self.event_type_slug}")
-                                logger.info(f"DEBUG: Checking personal event type: {event_slug} vs {self.event_type_slug}")
-                                if event_slug == self.event_type_slug:
-                                    print(f"Found personal event type: {event_type}")
-                                    logger.info(f"Found personal event type: {event_type}")
-                                    return event_type
-                            
-                            print(f"DEBUG: Event type '{self.event_type_slug}' not found in this personal endpoint")
-                            logger.info(f"DEBUG: Event type '{self.event_type_slug}' not found in this personal endpoint")
-                            continue  # Try next endpoint
-                            
-                        else:
-                            print(f"DEBUG: Personal endpoint {endpoint_url} returned status: {response.status_code}")
-                            logger.info(f"DEBUG: Personal endpoint {endpoint_url} returned status: {response.status_code}")
-                            continue  # Try next endpoint
-                            
-                except Exception as e:
-                    print(f"DEBUG: Error with personal endpoint {endpoint_url}: {e}")
-                    logger.info(f"DEBUG: Error with personal endpoint {endpoint_url}: {e}")
-                    continue  # Try next endpoint
-            
-            print(f"DEBUG: Event type '{self.event_type_slug}' not found in any endpoints (team or personal)")
-            logger.error(f"Event type '{self.event_type_slug}' not found in any endpoints (team or personal)")
+            logger.error(f"Event type '{self.event_type_slug}' not found in any endpoints")
             raise Exception(f"Event type '{self.event_type_slug}' not found")
             
         except Exception as e:
