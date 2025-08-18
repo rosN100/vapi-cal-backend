@@ -70,8 +70,8 @@ class CalClient:
             if not event_type:
                 raise Exception("Event type not found")
             
-            print(f"DEBUG: Found event type: {event_type.get('title')} (ID: {event_type.get('id')})")
-            logger.info(f"DEBUG: Found event type: {event_type.get('title')} (ID: {event_type.get('id')})")
+            print(f"DEBUG: Found event type: {event_type.get('title')} (ID: {event_type.get('id')}, slug: {event_type.get('slug')}, teamId: {event_type.get('teamId')})")
+            logger.info(f"DEBUG: Found event type: {event_type.get('title')} (ID: {event_type.get('id')}, slug: {event_type.get('slug')}, teamId: {event_type.get('teamId')})")
             
             event_type_id = event_type.get('id')
             team_id = event_type.get('teamId')
@@ -244,10 +244,13 @@ class CalClient:
                                         "teamSlug": "soraaya-team",
                                         "dateFrom": target_date_str,
                                         "dateTo": target_date_str,
-                                        "timeZone": "Asia/Calcutta"
+                                        "timeZone": "Asia/Calcutta",
+                                        "apiKey": self.api_key  # V1 API uses apiKey as query parameter
                                     }
                                     
-                                    response5 = await client.get(v1_url, params=v1_params, headers=headers)
+                                    # V1 API doesn't use Authorization header, only query parameter
+                                    v1_headers = {"Content-Type": "application/json"}
+                                    response5 = await client.get(v1_url, params=v1_params, headers=v1_headers)
                                     print(f"DEBUG: V1 API response status: {response5.status_code}")
                                     
                                     if response5.status_code == 200:
