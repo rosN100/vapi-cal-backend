@@ -200,9 +200,77 @@ class CalClient:
                                     "message": f"Found {len(available_slots)} available slots"
                                 }
                             else:
-                                print(f"DEBUG: All team approaches failed")
+                                print(f"DEBUG: Approach 3 also failed")
                                 print(f"DEBUG: Approach 3 response body: {response3.text}")
-                                raise Exception(f"Failed to check team availability: All endpoints returned 404")
+                                
+                                # Approach 4: Try routing forms endpoint (from Cal.com docs: "get available slots")
+                                print(f"DEBUG: Trying team approach 4 - routing forms endpoint")
+                                routing_url = f"{self.base_url}/routing-forms/response"
+                                params4 = {
+                                    "eventTypeSlug": event_type.get('slug', 'build3-demo'),
+                                    "teamSlug": "soraaya-team",
+                                    "date": target_date_str
+                                }
+                                
+                                response4 = await client.post(routing_url, json=params4, headers=headers)
+                                print(f"DEBUG: Approach 4 response status: {response4.status_code}")
+                                
+                                if response4.status_code == 200:
+                                    data = response4.json()
+                                    print(f"DEBUG: Approach 4 response data: {data}")
+                                    
+                                    # Parse the real availability data
+                                    available_slots = self._process_real_availability(data, target_date)
+                                    
+                                    # Format the response as readable text
+                                    formatted_response = self._format_availability_response(available_slots, target_date)
+                                    
+                                    return {
+                                        "success": True,
+                                        "target_date": target_date.strftime('%Y-%m-%d'),
+                                        "available_slots": available_slots,
+                                        "formatted_response": formatted_response,
+                                        "message": f"Found {len(available_slots)} available slots"
+                                    }
+                                else:
+                                    print(f"DEBUG: All team approaches failed including routing forms")
+                                    print(f"DEBUG: Approach 4 response body: {response4.text}")
+                                    
+                                    # Final attempt: Use Cal.com API v1 for availability (since v2 doesn't seem to support it)
+                                    print(f"DEBUG: Final attempt - trying Cal.com API v1 for availability")
+                                    v1_url = "https://api.cal.com/v1/availability"
+                                    v1_params = {
+                                        "eventTypeSlug": event_type.get('slug', 'build3-demo'),
+                                        "teamSlug": "soraaya-team",
+                                        "dateFrom": target_date_str,
+                                        "dateTo": target_date_str,
+                                        "timeZone": "Asia/Calcutta"
+                                    }
+                                    
+                                    response5 = await client.get(v1_url, params=v1_params, headers=headers)
+                                    print(f"DEBUG: V1 API response status: {response5.status_code}")
+                                    
+                                    if response5.status_code == 200:
+                                        data = response5.json()
+                                        print(f"DEBUG: V1 API response data: {data}")
+                                        
+                                        # Parse the v1 availability data
+                                        available_slots = self._process_real_availability(data, target_date)
+                                        
+                                        # Format the response as readable text
+                                        formatted_response = self._format_availability_response(available_slots, target_date)
+                                        
+                                        return {
+                                            "success": True,
+                                            "target_date": target_date.strftime('%Y-%m-%d'),
+                                            "available_slots": available_slots,
+                                            "formatted_response": formatted_response,
+                                            "message": f"Found {len(available_slots)} available slots (via v1 API)"
+                                        }
+                                    else:
+                                        print(f"DEBUG: V1 API also failed with status: {response5.status_code}")
+                                        print(f"DEBUG: V1 API response body: {response5.text}")
+                                        raise Exception(f"Failed to check team availability: All v2 and v1 endpoints returned 404")
             else:
                 # Personal event - try different endpoints since /slots doesn't exist
                 print(f"DEBUG: This is a personal event")
