@@ -32,7 +32,7 @@ class CalClient:
             logger.info(f"DEBUG: Constructed users URL: {url}")
             # Use v2 API headers instead of v1 params
             headers = {
-                "Authorization": f"Bearer cal_{self.api_key}",
+                "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
             
@@ -103,7 +103,7 @@ class CalClient:
             async with httpx.AsyncClient() as client:
                 # Add required headers for Cal.com API v2
                 headers = {
-                    "Authorization": f"Bearer cal_{self.api_key}",
+                    "Authorization": f"Bearer {self.api_key}",
                     "cal-api-version": "2024-09-04"
                 }
                 response = await client.get(url, params=params, headers=headers)
@@ -196,7 +196,7 @@ class CalClient:
                 # Use v2 /bookings endpoint with proper parameters
                 headers = {
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer cal_{self.api_key}",
+                    "Authorization": f"Bearer {self.api_key}",
                     "cal-api-version": "2024-08-13"
                 }
                 response = await client.post(
@@ -272,7 +272,7 @@ class CalClient:
             
             # Use v2 API headers
             headers = {
-                "Authorization": f"Bearer cal_{self.api_key}",
+                "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
             
