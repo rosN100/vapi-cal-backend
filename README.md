@@ -5,7 +5,7 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 ## Features
 
 - **Check Availability**: Webhook endpoint to check available appointment slots in Cal.com calendar
-- **Book Appointment**: Webhook endpoint to book appointments with candidate names
+- **Book Appointment**: Webhook endpoint to book appointments using email addresses (names are automatically derived)
 - **Configurable**: Environment variables for time ranges, slot durations, and API credentials
 - **Error Handling**: Comprehensive error handling and logging
 - **FastAPI**: Modern, fast Python web framework with automatic API documentation
@@ -49,7 +49,7 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `CAL_API_KEY` | Your Cal.com API key | Required |
-| `CAL_BASE_URL` | Cal.com API base URL | `https://api.cal.com/v1` |
+| `CAL_BASE_URL` | Cal.com API base URL | `https://api.cal.com/v2` |
 | `CAL_USERNAME` | Your Cal.com username | Required |
 | `CAL_EVENT_TYPE_SLUG` | Event type slug to use | `build3-demo` |
 | `DEFAULT_TIME_RANGE_DAYS` | Default days to check availability | `7` |
@@ -57,6 +57,8 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 | `HOST` | Server host | `0.0.0.0` |
 | `PORT` | Server port | `8000` |
 | `DEBUG` | Debug mode | `false` |
+
+**Note**: This application uses Cal.com API v2 for both availability checking (`/slots`) and booking (`/bookings`). The v2 API provides modern endpoints and better performance compared to v1.
 
 ## Usage
 
@@ -86,7 +88,7 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 **Request Body**:
 ```json
 {
-  "date": "2024-01-15",
+  "target_date": "2024-01-15",
   "time_range_days": 7
 }
 ```
@@ -95,7 +97,7 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 ```json
 {
   "success": true,
-  "date": "2024-01-15",
+  "target_date": "2024-01-15",
   "available_slots": [
     {
       "start_time": "09:00",
@@ -119,9 +121,9 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 **Request Body**:
 ```json
 {
-  "date": "2024-01-15",
+  "target_date": "2024-01-15",
   "time": "14:30",
-  "candidate_name": "John Doe"
+  "email_id": "john.doe@example.com"
 }
 ```
 
@@ -154,11 +156,18 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 # Vapi tool configuration
 {
   "name": "check_calendar_availability",
-  "description": "Check available appointment slots in Cal.com calendar",
+  "description": "Check available appointment slots for a specific date in Cal.com calendar",
   "url": "https://your-domain.com/webhook/check-availability",
   "method": "POST",
   "headers": {
     "Content-Type": "application/json"
+  },
+  "parameters": {
+    "target_date": {
+      "type": "string",
+      "description": "Date to check availability for (YYYY-MM-DD format)",
+      "required": true
+    }
   }
 }
 ```
@@ -169,11 +178,28 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 # Vapi tool configuration
 {
   "name": "book_calendar_appointment",
-  "description": "Book an appointment in Cal.com calendar",
+  "description": "Book an appointment in Cal.com calendar for a specific date and time",
   "url": "https://your-domain.com/webhook/book-appointment",
   "method": "POST",
   "headers": {
     "Content-Type": "application/json"
+  },
+  "parameters": {
+    "target_date": {
+      "type": "string",
+      "description": "Date for the appointment (YYYY-MM-DD format)",
+      "required": true
+    },
+    "time": {
+      "type": "string",
+      "description": "Start time for the appointment (HH:MM format)",
+      "required": true
+    },
+    "email_id": {
+      "type": "string",
+      "description": "Email address of the person booking the appointment",
+      "required": true
+    }
   }
 }
 ```
@@ -268,4 +294,4 @@ For issues related to:
 
 ## License
 
-[Add your license information here] 
+[Add your license information here]

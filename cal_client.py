@@ -70,9 +70,9 @@ class CalClient:
             start_date = target_date
             end_date = target_date  # Same day only
             
-            # Use Cal.com API v2 /slots endpoint for team events (correct method per official docs)
+            # Use Cal.com API v2 /slots endpoint
             if event_type.get("teamId"):
-                url = f"{self.base_url.replace('/v1/', '/v2/')}/slots"  # Use v2 API
+                url = f"{self.base_url}/slots"  # Use v2 API
                 params = {
                     "eventTypeSlug": event_type.get("slug", "build3-demo"),  # Use event type slug, fallback to build3-demo
                     "teamSlug": "soraaya-team",                              # Your team slug
@@ -81,13 +81,13 @@ class CalClient:
                     "timeZone": "Asia/Kolkata"                                # Your timezone
                 }
             else:
-                url = f"{self.base_url}/users/{user_id}/availability"
+                url = f"{self.base_url}/slots"  # Use v2 API for personal events too
                 params = {
-                    "apiKey": self.api_key,
-                    "eventTypeId": event_type["id"],
-                    "dateFrom": start_date.isoformat(),
-                    "dateTo": end_date.isoformat(),
-                    "duration": settings.default_slot_duration_minutes
+                    "eventTypeSlug": event_type.get("slug", "build3-demo"),
+                    "username": self.username,
+                    "start": start_date.isoformat(),
+                    "end": end_date.isoformat(),
+                    "timeZone": "Asia/Kolkata"
                 }
             
             async with httpx.AsyncClient() as client:
@@ -141,32 +141,35 @@ class CalClient:
             # Parse start time and calculate end time using datetime and timedelta
             from datetime import datetime, timedelta
             
-            # Combine date and time, assuming time is in HH:MM format
+            # Combine date and time, assuming time is in HH:MM format (IST)
+            # Convert IST to UTC for the API (IST = UTC+5:30)
+            from datetime import timezone
+            ist_offset = timedelta(hours=5, minutes=30)
+            
             start_datetime_str = f"{target_date}T{time}:00"
             start_dt = datetime.fromisoformat(start_datetime_str)
             
-            event_length_minutes = event_type.get("length", 30)
-            end_dt = start_dt + timedelta(minutes=event_length_minutes)
+            # Convert IST to UTC
+            start_dt_utc = start_dt - ist_offset
             
-            start_time = start_dt.strftime("%Y-%m-%dT%H:%M")  # Format as YYYY-MM-DDTHH:MM
-            end_time = end_dt.strftime("%Y-%m-%dT%H:%M")      # Format as YYYY-MM-DDTHH:MM
+            event_length_minutes = event_type.get("length", 30)
+            end_dt_utc = start_dt_utc + timedelta(minutes=event_length_minutes)
+            
+            start_time = start_dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")  # Format as UTC ISO8601
             
             # Log the exact data being sent for debugging
             logger.info(f"Event type details: {event_type}")
-            logger.info(f"Creating booking with start: {start_time}, end: {end_time}")
+            logger.info(f"Creating booking with start (UTC): {start_time}")
+            logger.info(f"Original IST time: {target_date}T{time}:00")
             
             booking_data = {
                 "eventTypeId": event_type["id"],
                 "start": start_time,
-                "end": end_time,
-                "duration": event_length_minutes,  # Add explicit duration field
-                "timeZone": "Asia/Kolkata",  # IST (UTC+5:30) - Required by Cal.com API
-                "attendees": [
-                    {
-                        "email": email_id,
-                        "name": candidate_name
-                    }
-                ],
+                "attendee": {
+                    "email": email_id,
+                    "name": candidate_name,
+                    "timeZone": "Asia/Kolkata"
+                },
                 "language": "en",
                 "metadata": {},
                 "responses": {
@@ -178,28 +181,33 @@ class CalClient:
             # Log the complete booking data
             logger.info(f"Complete booking data: {booking_data}")
             
-            # Make booking request using Cal.com API v1 (v2 doesn't have /bookings endpoint)
+            # Make booking request using Cal.com API v2
             async with httpx.AsyncClient() as client:
-                # Use v1 /bookings endpoint with proper parameters for team events
-                params = {"apiKey": self.api_key}
+                # Use v2 /bookings endpoint with proper parameters
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                    "cal-api-version": "2024-08-13"
+                }
                 response = await client.post(
                     f"{self.base_url}/bookings",
-                    params=params,
+                    headers=headers,
                     json=booking_data,
                     timeout=30.0
                 )
                 
-                if response.status_code == 200:
+                if response.status_code == 201:  # v2 API returns 201 for successful creation
                     booking_info = response.json()
+                    data = booking_info.get("data", {})
                     return {
                         "success": True,
-                        "booking_id": booking_info.get("uid", "unknown"),
+                        "booking_id": data.get("uid", "unknown"),
                         "message": "Appointment booked successfully",
                         "appointment_details": {
-                            "booking_id": booking_info.get("uid", "unknown"),
-                            "start_time": f"{target_date}T{time}:00Z",
-                            "end_time": f"{target_date}T{time}:30Z",
-                            "title": f"Build3<> {candidate_name}",
+                            "booking_id": data.get("uid", "unknown"),
+                            "start_time": data.get("start", f"{target_date}T{time}:00Z"),
+                            "end_time": data.get("end", f"{target_date}T{time}:30Z"),
+                            "title": data.get("title", f"Build3<> {candidate_name}"),
                             "attendees": [{"email": email_id, "name": candidate_name}]
                         }
                     }
@@ -207,19 +215,19 @@ class CalClient:
                     error_data = response.json()
                     error_message = error_data.get("message", "Unknown error")
                     
-                    # Handle specific Cal.com error cases
+                    # Handle specific Cal.com v2 API error cases
                     if error_message == "no_available_users_found_error":
                         raise Exception(
                             "No team members available for this time slot. "
                             "Please check team member availability or contact your administrator."
                         )
-                    elif error_message == "no_available_users_found_error":
+                    elif "no_available_users_found_error" in error_message:
                         raise Exception(
                             "No team members are assigned to this event type. "
                             "Please contact your administrator to assign team members."
                         )
                     else:
-                        raise Exception(f"Cal.com API error: {error_message}")
+                        raise Exception(f"Cal.com API v2 error: {error_message}")
                         
         except httpx.HTTPStatusError as e:
             # Log detailed error information

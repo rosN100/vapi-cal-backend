@@ -8,7 +8,7 @@ load_dotenv()
 class Settings:
     # Cal.com API Configuration
     cal_api_key: str = os.getenv("CAL_API_KEY", "")
-    cal_base_url: str = os.getenv("CAL_BASE_URL", "https://api.cal.com/v1")
+    cal_base_url: str = os.getenv("CAL_BASE_URL", "https://api.cal.com/v2")
     cal_username: str = os.getenv("CAL_USERNAME", "")
     cal_event_type_slug: str = os.getenv("CAL_EVENT_TYPE_SLUG", "build3-demo")
     
