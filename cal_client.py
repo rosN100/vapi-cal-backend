@@ -73,67 +73,139 @@ class CalClient:
             print(f"DEBUG: Found event type: {event_type.get('title')} (ID: {event_type.get('id')})")
             logger.info(f"DEBUG: Found event type: {event_type.get('title')} (ID: {event_type.get('id')})")
             
-            # Use the correct Cal.com v2 availability endpoint
-            # According to Cal.com v2 docs: GET /v2/slots with query parameters
             event_type_id = event_type.get('id')
+            team_id = event_type.get('teamId')
+            
             if not event_type_id:
                 raise Exception("Event type ID not found")
             
             # Convert target date to ISO format for the API
             target_date_str = target_date.strftime('%Y-%m-%d')
             
-            # Use the /slots endpoint with GET method and query parameters
-            slots_url = f"{self.base_url}/slots"
-            
-            # Prepare the query parameters for real availability checking
-            # Based on Cal.com v2 documentation
-            params = {
-                "eventTypeId": str(event_type_id),
-                "startTime": f"{target_date_str}T00:00:00Z",
-                "endTime": f"{target_date_str}T23:59:59Z",
-                "timezone": "Asia/Calcutta"  # Use IST timezone
-            }
-            
-            print(f"DEBUG: Checking availability for event type ID: {event_type_id}")
-            print(f"DEBUG: Target date: {target_date_str}")
-            print(f"DEBUG: Making GET request to: {slots_url}")
-            print(f"DEBUG: Query parameters: {params}")
-            logger.info(f"DEBUG: Checking availability for event type ID: {event_type_id}")
-            logger.info(f"DEBUG: Target date: {target_date_str}")
-            
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json"
             }
             
-            async with httpx.AsyncClient() as client:
-                # Use GET method with query parameters as per Cal.com v2 docs
-                response = await client.get(slots_url, params=params, headers=headers)
-                print(f"DEBUG: Slots response status: {response.status_code}")
+            # Try different approaches based on whether it's a team event or personal event
+            if team_id:
+                print(f"DEBUG: This is a team event (teamId: {team_id})")
+                logger.info(f"DEBUG: This is a team event (teamId: {team_id})")
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    print(f"DEBUG: Slots response data: {data}")
-                    logger.info(f"DEBUG: Slots response: {data}")
+                # For team events, we need to use a different approach
+                # Let's try the /slots endpoint with different parameters
+                
+                # Approach 1: Try with eventTypeSlug and teamSlug (like the public URL)
+                slots_url = f"{self.base_url}/slots"
+                params = {
+                    "eventTypeSlug": event_type.get('slug', 'build3-demo'),
+                    "teamSlug": "soraaya-team",  # From the public URL
+                    "startTime": f"{target_date_str}T00:00:00Z",
+                    "endTime": f"{target_date_str}T23:59:59Z",
+                    "timeZone": "Asia/Calcutta"
+                }
+                
+                print(f"DEBUG: Trying team approach 1 - eventTypeSlug + teamSlug")
+                print(f"DEBUG: Making GET request to: {slots_url}")
+                print(f"DEBUG: Query parameters: {params}")
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(slots_url, params=params, headers=headers)
+                    print(f"DEBUG: Slots response status: {response.status_code}")
                     
-                    # Parse the real availability data
-                    available_slots = self._process_real_availability(data, target_date)
+                    if response.status_code == 200:
+                        data = response.json()
+                        print(f"DEBUG: Slots response data: {data}")
+                        logger.info(f"DEBUG: Slots response: {data}")
+                        
+                        # Parse the real availability data
+                        available_slots = self._process_real_availability(data, target_date)
+                        
+                        # Format the response as readable text
+                        formatted_response = self._format_availability_response(available_slots, target_date)
+                        
+                        return {
+                            "success": True,
+                            "target_date": target_date.strftime('%Y-%m-%d'),
+                            "available_slots": available_slots,
+                            "formatted_response": formatted_response,
+                            "message": f"Found {len(available_slots)} available slots"
+                        }
+                    else:
+                        print(f"DEBUG: Team approach 1 failed with status: {response.status_code}")
+                        print(f"DEBUG: Response body: {response.text}")
+                        
+                        # Approach 2: Try with just eventTypeId (original approach)
+                        print(f"DEBUG: Trying team approach 2 - eventTypeId only")
+                        params2 = {
+                            "eventTypeId": str(event_type_id),
+                            "startTime": f"{target_date_str}T00:00:00Z",
+                            "endTime": f"{target_date_str}T23:59:59Z",
+                            "timeZone": "Asia/Calcutta"
+                        }
+                        
+                        response2 = await client.get(slots_url, params=params2, headers=headers)
+                        print(f"DEBUG: Approach 2 response status: {response2.status_code}")
+                        
+                        if response2.status_code == 200:
+                            data = response2.json()
+                            print(f"DEBUG: Approach 2 response data: {data}")
+                            
+                            # Parse the real availability data
+                            available_slots = self._process_real_availability(data, target_date)
+                            
+                            # Format the response as readable text
+                            formatted_response = self._format_availability_response(available_slots, target_date)
+                            
+                            return {
+                                "success": True,
+                                "target_date": target_date.strftime('%Y-%m-%d'),
+                                "available_slots": available_slots,
+                                "formatted_response": formatted_response,
+                                "message": f"Found {len(available_slots)} available slots"
+                            }
+                        else:
+                            print(f"DEBUG: Team approach 2 also failed with status: {response2.status_code}")
+                            print(f"DEBUG: Response body: {response2.text}")
+                            raise Exception(f"Failed to check team availability: HTTP {response2.status_code}")
+            else:
+                # Personal event - use original approach
+                print(f"DEBUG: This is a personal event")
+                logger.info(f"DEBUG: This is a personal event")
+                
+                slots_url = f"{self.base_url}/slots"
+                params = {
+                    "eventTypeId": str(event_type_id),
+                    "startTime": f"{target_date_str}T00:00:00Z",
+                    "endTime": f"{target_date_str}T23:59:59Z",
+                    "timeZone": "Asia/Calcutta"
+                }
+                
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(slots_url, params=params, headers=headers)
+                    print(f"DEBUG: Personal event response status: {response.status_code}")
                     
-                    # Format the response as readable text
-                    formatted_response = self._format_availability_response(available_slots, target_date)
-                    
-                    return {
-                        "success": True,
-                        "target_date": target_date.strftime('%Y-%m-%d'),
-                        "available_slots": available_slots,
-                        "formatted_response": formatted_response,
-                        "message": f"Found {len(available_slots)} available slots"
-                    }
-                else:
-                    print(f"DEBUG: Slots request failed with status: {response.status_code}")
-                    print(f"DEBUG: Response body: {response.text}")
-                    logger.error(f"HTTP error checking availability: {response.status_code}")
-                    raise Exception(f"Failed to check availability: HTTP {response.status_code}")
+                    if response.status_code == 200:
+                        data = response.json()
+                        print(f"DEBUG: Personal event response data: {data}")
+                        
+                        # Parse the real availability data
+                        available_slots = self._process_real_availability(data, target_date)
+                        
+                        # Format the response as readable text
+                        formatted_response = self._format_availability_response(available_slots, target_date)
+                        
+                        return {
+                            "success": True,
+                            "target_date": target_date.strftime('%Y-%m-%d'),
+                            "available_slots": available_slots,
+                            "formatted_response": formatted_response,
+                            "message": f"Found {len(available_slots)} available slots"
+                        }
+                    else:
+                        print(f"DEBUG: Personal event failed with status: {response.status_code}")
+                        print(f"DEBUG: Response body: {response.text}")
+                        raise Exception(f"Failed to check personal availability: HTTP {response.status_code}")
                 
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error checking availability: {e}")
