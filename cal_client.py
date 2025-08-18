@@ -93,10 +93,10 @@ class CalClient:
                 logger.info(f"DEBUG: This is a team event (teamId: {team_id})")
                 
                 # For team events, we need to use a different approach
-                # Let's try the /slots endpoint with different parameters
+                # The /v2/slots endpoint doesn't exist, so let's try other possibilities
                 
-                # Approach 1: Try with eventTypeSlug and teamSlug (like the public URL)
-                slots_url = f"{self.base_url}/slots"
+                # Approach 1: Try public availability endpoint (matching the public URL structure)
+                slots_url = f"{self.base_url}/public/availability"
                 params = {
                     "eventTypeSlug": event_type.get('slug', 'build3-demo'),
                     "teamSlug": "soraaya-team",  # From the public URL
@@ -135,8 +135,9 @@ class CalClient:
                         print(f"DEBUG: Team approach 1 failed with status: {response.status_code}")
                         print(f"DEBUG: Response body: {response.text}")
                         
-                        # Approach 2: Try with just eventTypeId (original approach)
-                        print(f"DEBUG: Trying team approach 2 - eventTypeId only")
+                        # Approach 2: Try team-specific endpoint structure
+                        print(f"DEBUG: Trying team approach 2 - team-specific endpoint")
+                        team_slots_url = f"{self.base_url}/teams/{team_id}/availability"
                         params2 = {
                             "eventTypeId": str(event_type_id),
                             "startTime": f"{target_date_str}T00:00:00Z",
@@ -144,7 +145,7 @@ class CalClient:
                             "timeZone": "Asia/Calcutta"
                         }
                         
-                        response2 = await client.get(slots_url, params=params2, headers=headers)
+                        response2 = await client.get(team_slots_url, params=params2, headers=headers)
                         print(f"DEBUG: Approach 2 response status: {response2.status_code}")
                         
                         if response2.status_code == 200:
@@ -167,13 +168,47 @@ class CalClient:
                         else:
                             print(f"DEBUG: Team approach 2 also failed with status: {response2.status_code}")
                             print(f"DEBUG: Response body: {response2.text}")
-                            raise Exception(f"Failed to check team availability: HTTP {response2.status_code}")
+                            
+                            # Approach 3: Try booking-style endpoint (since this is for availability checking for booking)
+                            print(f"DEBUG: Trying team approach 3 - booking-style endpoint")
+                            booking_url = f"{self.base_url}/bookings/availability"
+                            params3 = {
+                                "eventTypeSlug": event_type.get('slug', 'build3-demo'),
+                                "teamSlug": "soraaya-team",
+                                "date": target_date_str,
+                                "timeZone": "Asia/Calcutta"
+                            }
+                            
+                            response3 = await client.get(booking_url, params=params3, headers=headers)
+                            print(f"DEBUG: Approach 3 response status: {response3.status_code}")
+                            
+                            if response3.status_code == 200:
+                                data = response3.json()
+                                print(f"DEBUG: Approach 3 response data: {data}")
+                                
+                                # Parse the real availability data
+                                available_slots = self._process_real_availability(data, target_date)
+                                
+                                # Format the response as readable text
+                                formatted_response = self._format_availability_response(available_slots, target_date)
+                                
+                                return {
+                                    "success": True,
+                                    "target_date": target_date.strftime('%Y-%m-%d'),
+                                    "available_slots": available_slots,
+                                    "formatted_response": formatted_response,
+                                    "message": f"Found {len(available_slots)} available slots"
+                                }
+                            else:
+                                print(f"DEBUG: All team approaches failed")
+                                print(f"DEBUG: Approach 3 response body: {response3.text}")
+                                raise Exception(f"Failed to check team availability: All endpoints returned 404")
             else:
-                # Personal event - use original approach
+                # Personal event - try different endpoints since /slots doesn't exist
                 print(f"DEBUG: This is a personal event")
                 logger.info(f"DEBUG: This is a personal event")
                 
-                slots_url = f"{self.base_url}/slots"
+                slots_url = f"{self.base_url}/event-types/{event_type_id}/availability"
                 params = {
                     "eventTypeId": str(event_type_id),
                     "startTime": f"{target_date_str}T00:00:00Z",
