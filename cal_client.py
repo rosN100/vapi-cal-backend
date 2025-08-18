@@ -288,73 +288,74 @@ class CalClient:
                 "cal-api-version": "2024-08-13"
             }
             
-            response = await self.client.get(url, headers=headers)
-            response.raise_for_status()
-            
-            data = response.json()
-            logger.info(f"DEBUG: Full event types response: {data}")
-            
-            # Try different response structures
-            event_types = []
-            if data.get("data", {}).get("event_types"):
-                event_types = data.get("data", {}).get("event_types", [])
-                logger.info(f"DEBUG: Found event_types in data.data.event_types: {len(event_types)} items")
-            elif data.get("event_types"):
-                event_types = data.get("event_types", [])
-                logger.info(f"DEBUG: Found event_types in data.event_types: {len(event_types)} items")
-            elif data.get("data"):
-                event_types = data.get("data", [])
-                logger.info(f"DEBUG: Found event_types in data.data: {len(event_types)} items")
-            else:
-                logger.info(f"DEBUG: No event_types found in response structure")
-            
-            logger.info(f"DEBUG: All event types: {event_types}")
-            
-            # Find the build3-demo event type
-            for event_type in event_types:
-                logger.info(f"DEBUG: Checking event type: {event_type.get('slug')} vs {self.event_type_slug}")
-                if event_type.get("slug") == self.event_type_slug:
-                    logger.info(f"Found event type: {event_type}")
-                    return event_type
-            
-            # If not found in personal event types, try team event types
-            logger.info(f"DEBUG: Event type '{self.event_type_slug}' not found in personal event types, trying team event types...")
-            
-            # Get full user info to check for organization
-            user_info = await self._get_user_info()
-            if user_info and user_info.get("organizationId"):
-                org_id = user_info.get("organizationId")
-                logger.info(f"DEBUG: User has organization ID: {org_id}")
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
                 
-                # Try to get team event types
-                team_url = f"{self.base_url}/organizations/{org_id}/teams/event-types"
-                logger.info(f"DEBUG: Trying team event types URL: {team_url}")
+                data = response.json()
+                logger.info(f"DEBUG: Full event types response: {data}")
                 
-                team_response = await self.client.get(team_url, headers=headers)
-                if team_response.status_code == 200:
-                    team_data = team_response.json()
-                    logger.info(f"DEBUG: Team event types response: {team_data}")
-                    
-                    team_event_types = []
-                    if team_data.get("data", {}).get("event_types"):
-                        team_event_types = team_data.get("data", {}).get("event_types", [])
-                    elif team_data.get("event_types"):
-                        team_event_types = team_data.get("event_types", [])
-                    elif team_data.get("data"):
-                        team_event_types = team_data.get("data", [])
-                    
-                    logger.info(f"DEBUG: Team event types found: {len(team_event_types)} items")
-                    
-                    for event_type in team_event_types:
-                        logger.info(f"DEBUG: Checking team event type: {event_type.get('slug')} vs {self.event_type_slug}")
-                        if event_type.get("slug") == self.event_type_slug:
-                            logger.info(f"Found team event type: {event_type}")
-                            return event_type
+                # Try different response structures
+                event_types = []
+                if data.get("data", {}).get("event_types"):
+                    event_types = data.get("data", {}).get("event_types", [])
+                    logger.info(f"DEBUG: Found event_types in data.data.event_types: {len(event_types)} items")
+                elif data.get("event_types"):
+                    event_types = data.get("event_types", [])
+                    logger.info(f"DEBUG: Found event_types in data.event_types: {len(event_types)} items")
+                elif data.get("data"):
+                    event_types = data.get("data", [])
+                    logger.info(f"DEBUG: Found event_types in data.data: {len(event_types)} items")
                 else:
-                    logger.info(f"DEBUG: Team event types request failed with status: {team_response.status_code}")
-            
-            logger.error(f"Event type '{self.event_type_slug}' not found in personal or team event types")
-            raise Exception(f"Event type '{self.event_type_slug}' not found")
+                    logger.info(f"DEBUG: No event_types found in response structure")
+                
+                logger.info(f"DEBUG: All event types: {event_types}")
+                
+                # Find the build3-demo event type
+                for event_type in event_types:
+                    logger.info(f"DEBUG: Checking event type: {event_type.get('slug')} vs {self.event_type_slug}")
+                    if event_type.get("slug") == self.event_type_slug:
+                        logger.info(f"Found event type: {event_type}")
+                        return event_type
+                
+                # If not found in personal event types, try team event types
+                logger.info(f"DEBUG: Event type '{self.event_type_slug}' not found in personal event types, trying team event types...")
+                
+                # Get full user info to check for organization
+                user_info = await self._get_user_info()
+                if user_info and user_info.get("organizationId"):
+                    org_id = user_info.get("organizationId")
+                    logger.info(f"DEBUG: User has organization ID: {org_id}")
+                    
+                    # Try to get team event types
+                    team_url = f"{self.base_url}/organizations/{org_id}/teams/event-types"
+                    logger.info(f"DEBUG: Trying team event types URL: {team_url}")
+                    
+                    team_response = await client.get(team_url, headers=headers)
+                    if team_response.status_code == 200:
+                        team_data = team_response.json()
+                        logger.info(f"DEBUG: Team event types response: {team_data}")
+                        
+                        team_event_types = []
+                        if team_data.get("data", {}).get("event_types"):
+                            team_event_types = team_data.get("data", {}).get("event_types", [])
+                        elif team_data.get("event_types"):
+                            team_event_types = team_data.get("event_types", [])
+                        elif team_data.get("data"):
+                            team_event_types = team_data.get("data", [])
+                        
+                        logger.info(f"DEBUG: Team event types found: {len(team_event_types)} items")
+                        
+                        for event_type in team_event_types:
+                            logger.info(f"DEBUG: Checking team event type: {event_type.get('slug')} vs {self.event_type_slug}")
+                            if event_type.get("slug") == self.event_type_slug:
+                                logger.info(f"Found team event type: {event_type}")
+                                return event_type
+                    else:
+                        logger.info(f"DEBUG: Team event types request failed with status: {team_response.status_code}")
+                
+                logger.error(f"Event type '{self.event_type_slug}' not found in personal or team event types")
+                raise Exception(f"Event type '{self.event_type_slug}' not found")
             
         except Exception as e:
             logger.error(f"Error getting event type details: {e}")
@@ -371,18 +372,19 @@ class CalClient:
                 "cal-api-version": "2024-08-13"
             }
             
-            response = await self.client.get(url, headers=headers)
-            response.raise_for_status()
-            
-            data = response.json()
-            logger.info(f"DEBUG: User info response: {data}")
-            
-            if data.get("status") == "success" and data.get("data"):
-                user_data = data.get("data", {})
-                logger.info(f"DEBUG: Extracted user_data: {user_data}")
-                return user_data
-            
-            return None
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+                
+                data = response.json()
+                logger.info(f"DEBUG: User info response: {data}")
+                
+                if data.get("status") == "success" and data.get("data"):
+                    user_data = data.get("data", {})
+                    logger.info(f"DEBUG: Extracted user_data: {user_data}")
+                    return user_data
+                
+                return None
             
         except Exception as e:
             logger.error(f"Error getting user info: {e}")
