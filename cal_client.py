@@ -92,20 +92,20 @@ class CalClient:
                 print(f"DEBUG: This is a team event (teamId: {team_id})")
                 logger.info(f"DEBUG: This is a team event (teamId: {team_id})")
                 
-                # For team events, we need to use a different approach
-                # The /v2/slots endpoint doesn't exist, so let's try other possibilities
+                # For team events, use the CORRECT Cal.com API v2 /slots endpoint
+                # Based on official documentation: GET /v2/slots with teamSlug and eventTypeSlug
                 
-                # Approach 1: Try public availability endpoint (matching the public URL structure)
-                slots_url = f"{self.base_url}/public/availability"
+                # Use the correct /v2/slots endpoint with proper parameters
+                slots_url = f"{self.base_url}/slots"
                 params = {
-                    "eventTypeSlug": event_type.get('slug', 'build3-demo'),
-                    "teamSlug": "soraaya-team",  # From the public URL
+                    "teamSlug": "soraaya-team",  # Correct parameter name
+                    "eventTypeSlug": event_type.get('slug', 'build3-demo'),  # Correct parameter name
                     "startTime": f"{target_date_str}T00:00:00Z",
                     "endTime": f"{target_date_str}T23:59:59Z",
-                    "timeZone": "Asia/Calcutta"
+                    "timeZone": "Asia/Kolkata"  # Use the exact timezone from docs
                 }
                 
-                print(f"DEBUG: Trying team approach 1 - eventTypeSlug + teamSlug")
+                print(f"DEBUG: Using CORRECT Cal.com v2 /slots endpoint with teamSlug + eventTypeSlug")
                 print(f"DEBUG: Making GET request to: {slots_url}")
                 print(f"DEBUG: Query parameters: {params}")
                 
