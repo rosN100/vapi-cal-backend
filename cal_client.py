@@ -270,10 +270,20 @@ class CalClient:
     async def _get_event_type(self) -> dict:
         """Get event type details by slug."""
         try:
-            # First try personal event types
-            url = f"{self.base_url}/event-types"
+            # First get user ID to construct the correct endpoint
+            user_info = await self._get_user_id()
+            if not user_info:
+                raise Exception("Failed to get user information")
+            
+            user_id = user_info.get("id")
+            if not user_id:
+                raise Exception("User ID not found in user information")
+            
+            # Use the correct v2 API endpoint: /v2/users/{userId}/event-types
+            url = f"{self.base_url}/users/{user_id}/event-types"
             logger.info(f"DEBUG: Getting event types from base_url: {self.base_url}")
             logger.info(f"DEBUG: Constructed event types URL: {url}")
+            logger.info(f"DEBUG: Looking for event type slug: {self.event_type_slug}")
             
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -313,9 +323,8 @@ class CalClient:
                 # If not found in personal event types, try team event types
                 logger.info(f"DEBUG: Event type '{self.event_type_slug}' not found in personal event types, trying team event types...")
                 
-                # Get user info to find organization/team details
-                user_info = await self._get_user_id()
-                if user_info and user_info.get("organizationId"):
+                # Check if user has organization
+                if user_info.get("organizationId"):
                     org_id = user_info.get("organizationId")
                     logger.info(f"DEBUG: User has organization ID: {org_id}")
                     

@@ -9,7 +9,7 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 - **Dual Event Type Support**: Automatically checks both personal and team event types to find the correct event type slug
 - **Enhanced Debugging**: Comprehensive logging for troubleshooting API responses and data flow
 
-**Note**: This application uses Cal.com API v2 for both availability checking (`/slots`) and booking (`/bookings`). The v2 API provides modern endpoints and better performance compared to v1. The application automatically handles both personal and team event types to ensure compatibility with different Cal.com account structures.
+**Note**: This application uses Cal.com API v2 for both availability checking (`/slots`) and booking (`/bookings`). The v2 API provides modern endpoints and better performance compared to v1. The application automatically handles both personal event types (`/v2/users/{userId}/event-types`) and team event types (`/v2/organizations/{orgId}/teams/event-types`) to ensure compatibility with different Cal.com account structures.
 
 ## Prerequisites
 
