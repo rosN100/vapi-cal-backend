@@ -63,74 +63,77 @@ class CalClient:
             return None
     
     async def check_availability(self, target_date: date, time_range_days: int = None) -> Dict:
-        """Check availability for a specific date range"""
-        if time_range_days is None:
-            time_range_days = settings.default_time_range_days
-            
+        """Check available appointment slots for a specific date."""
         try:
-            # Get user ID first
-            user_id = await self._get_user_id()
-            if not user_id:
-                raise Exception("Failed to get user ID")
-            
             # Get event type details
             event_type = await self._get_event_type()
             if not event_type:
-                raise Exception("Failed to get event type details")
+                raise Exception("Event type not found")
             
-            # Get availability for the specific date only (not date range)
-            start_date = target_date
-            end_date = target_date  # Same day only
+            print(f"DEBUG: Found event type: {event_type.get('title')} (ID: {event_type.get('id')})")
+            logger.info(f"DEBUG: Found event type: {event_type.get('title')} (ID: {event_type.get('id')})")
             
-            # Use Cal.com API v2 /slots endpoint
-            if event_type.get("teamId"):
-                url = f"{self.base_url}/slots"  # Use v2 API
-                logger.info(f"DEBUG: Using base_url: {self.base_url}")
-                logger.info(f"DEBUG: Constructed slots URL: {url}")
-                params = {
-                    "eventTypeSlug": event_type.get("slug", "build3-demo"),  # Use event type slug, fallback to build3-demo
-                    "teamSlug": "soraaya-team",                              # Your team slug
-                    "start": start_date.isoformat(),                          # ISO8601 format
-                    "end": end_date.isoformat(),                              # ISO8601 format
-                    "timeZone": "Asia/Kolkata"                                # Your timezone
-                }
-            else:
-                url = f"{self.base_url}/slots"  # Use v2 API for personal events too
-                logger.info(f"DEBUG: Using base_url: {self.base_url}")
-                logger.info(f"DEBUG: Constructed slots URL: {url}")
-                params = {
-                    "eventTypeSlug": event_type.get("slug", "build3-demo"),
-                    "username": self.username,
-                    "start": start_date.isoformat(),
-                    "end": end_date.isoformat(),
-                    "timeZone": "Asia/Kolkata"
-                }
+            # Use the correct Cal.com v2 availability endpoint
+            # According to Cal.com v2 docs: GET /v2/slots with query parameters
+            event_type_id = event_type.get('id')
+            if not event_type_id:
+                raise Exception("Event type ID not found")
+            
+            # Convert target date to ISO format for the API
+            target_date_str = target_date.strftime('%Y-%m-%d')
+            
+            # Use the /slots endpoint with GET method and query parameters
+            slots_url = f"{self.base_url}/slots"
+            
+            # Prepare the query parameters for real availability checking
+            # Based on Cal.com v2 documentation
+            params = {
+                "eventTypeId": str(event_type_id),
+                "startTime": f"{target_date_str}T00:00:00Z",
+                "endTime": f"{target_date_str}T23:59:59Z",
+                "timezone": "Asia/Calcutta"  # Use IST timezone
+            }
+            
+            print(f"DEBUG: Checking availability for event type ID: {event_type_id}")
+            print(f"DEBUG: Target date: {target_date_str}")
+            print(f"DEBUG: Making GET request to: {slots_url}")
+            print(f"DEBUG: Query parameters: {params}")
+            logger.info(f"DEBUG: Checking availability for event type ID: {event_type_id}")
+            logger.info(f"DEBUG: Target date: {target_date_str}")
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
             
             async with httpx.AsyncClient() as client:
-                # Add required headers for Cal.com API v2
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "cal-api-version": "2024-09-04"
-                }
-                response = await client.get(url, params=params, headers=headers)
-                response.raise_for_status()
+                # Use GET method with query parameters as per Cal.com v2 docs
+                response = await client.get(slots_url, params=params, headers=headers)
+                print(f"DEBUG: Slots response status: {response.status_code}")
                 
-                data = response.json()
-                logger.info(f"Availability response: {data}")
-                
-                # Process availability data
-                available_slots = self._process_availability(data, target_date)
-                
-                # Format the response as readable text
-                formatted_response = self._format_availability_response(available_slots, target_date)
-                
-                return {
-                    "success": True,
-                    "target_date": target_date.strftime('%Y-%m-%d'),
-                    "available_slots": available_slots,
-                    "formatted_response": formatted_response,
-                    "message": f"Found {len(available_slots)} available slots"
-                }
+                if response.status_code == 200:
+                    data = response.json()
+                    print(f"DEBUG: Slots response data: {data}")
+                    logger.info(f"DEBUG: Slots response: {data}")
+                    
+                    # Parse the real availability data
+                    available_slots = self._process_real_availability(data, target_date)
+                    
+                    # Format the response as readable text
+                    formatted_response = self._format_availability_response(available_slots, target_date)
+                    
+                    return {
+                        "success": True,
+                        "target_date": target_date.strftime('%Y-%m-%d'),
+                        "available_slots": available_slots,
+                        "formatted_response": formatted_response,
+                        "message": f"Found {len(available_slots)} available slots"
+                    }
+                else:
+                    print(f"DEBUG: Slots request failed with status: {response.status_code}")
+                    print(f"DEBUG: Response body: {response.text}")
+                    logger.error(f"HTTP error checking availability: {response.status_code}")
+                    raise Exception(f"Failed to check availability: HTTP {response.status_code}")
                 
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP error checking availability: {e}")
@@ -409,6 +412,65 @@ class CalClient:
         except Exception as e:
             logger.error(f"Error processing availability: {e}")
             return []
+    
+    def _process_real_availability(self, availability_data: Dict, target_date: date) -> List[Dict]:
+        """Process real availability data from Cal.com API."""
+        try:
+            available_slots = []
+            
+            # The response structure might vary, let's handle different formats
+            slots = []
+            if availability_data.get("data", {}).get("slots"):
+                slots = availability_data.get("data", {}).get("slots", [])
+            elif availability_data.get("slots"):
+                slots = availability_data.get("slots", [])
+            elif availability_data.get("data"):
+                slots = availability_data.get("data", [])
+            
+            print(f"DEBUG: Processing {len(slots)} slots from availability data")
+            
+            for slot in slots:
+                # Extract start time from the slot data
+                start_time = slot.get("time", "")
+                if start_time:
+                    # Convert UTC time to IST and format as HH:MM
+                    try:
+                        # Parse the time and create a proper slot
+                        slot_start = start_time
+                        if isinstance(slot_start, str) and "T" in slot_start:
+                            # Extract time part from ISO string
+                            time_part = slot_start.split("T")[1][:5]  # Get HH:MM part
+                        else:
+                            time_part = str(slot_start)
+                        
+                        # Create slot with 30-minute duration (based on event type)
+                        available_slots.append({
+                            "start_time": time_part,
+                            "end_time": self._add_minutes_to_time(time_part, 30),
+                            "available": True
+                        })
+                    except Exception as e:
+                        print(f"DEBUG: Error processing slot {slot}: {e}")
+                        continue
+            
+            print(f"DEBUG: Processed {len(available_slots)} available slots")
+            return available_slots
+            
+        except Exception as e:
+            print(f"DEBUG: Error processing availability data: {e}")
+            logger.error(f"Error processing availability data: {e}")
+            return []
+    
+    def _add_minutes_to_time(self, time_str: str, minutes: int) -> str:
+        """Add minutes to a time string in HH:MM format."""
+        try:
+            from datetime import datetime, timedelta
+            time_obj = datetime.strptime(time_str, "%H:%M")
+            new_time = time_obj + timedelta(minutes=minutes)
+            return new_time.strftime("%H:%M")
+        except Exception as e:
+            print(f"DEBUG: Error adding minutes to time {time_str}: {e}")
+            return time_str
     
     def _format_availability_response(self, available_slots: List[Dict], target_date: date) -> str:
         """Format availability response as readable text"""
