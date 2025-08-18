@@ -44,8 +44,13 @@ class CalClient:
                 logger.info(f"Users response: {data}")
                 
                 # In v2 API, /me returns the current user directly
-                if data.get("id"):
-                    self.user_id = data.get("id")
+                # The response structure is: {"status": "success", "data": {"id": 123, ...}}
+                user_data = data.get("data", {})
+                logger.info(f"DEBUG: Extracted user_data: {user_data}")
+                logger.info(f"DEBUG: Looking for user ID in user_data: {user_data.get('id')}")
+                
+                if user_data.get("id"):
+                    self.user_id = user_data.get("id")
                     logger.info(f"Found user ID: {self.user_id} for username: {self.username}")
                     return self.user_id
                 
