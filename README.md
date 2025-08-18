@@ -4,11 +4,12 @@ This FastAPI application provides webhook endpoints that allow Vapi AI agents to
 
 ## Features
 
-- **Check Availability**: Webhook endpoint to check available appointment slots in Cal.com calendar
+- **Check Availability**: Webhook endpoint to check available appointment slots for a specific date
 - **Book Appointment**: Webhook endpoint to book appointments using email addresses (names are automatically derived)
-- **Configurable**: Environment variables for time ranges, slot durations, and API credentials
-- **Error Handling**: Comprehensive error handling and logging
-- **FastAPI**: Modern, fast Python web framework with automatic API documentation
+- **Dual Event Type Support**: Automatically checks both personal and team event types to find the correct event type slug
+- **Enhanced Debugging**: Comprehensive logging for troubleshooting API responses and data flow
+
+**Note**: This application uses Cal.com API v2 for both availability checking (`/slots`) and booking (`/bookings`). The v2 API provides modern endpoints and better performance compared to v1. The application automatically handles both personal and team event types to ensure compatibility with different Cal.com account structures.
 
 ## Prerequisites
 
@@ -295,3 +296,13 @@ For issues related to:
 ## License
 
 [Add your license information here]
+
+
+## data flow 
+1. Vapi Request → main.py (endpoint)
+2. main.py → models.py (validation)
+3. main.py → cal_client.py (business logic)
+4. cal_client.py → Cal.com API v2
+5. Cal.com Response → cal_client.py (processing)
+6. cal_client.py → main.py (formatted response)
+7. main.py → Vapi (final response)
