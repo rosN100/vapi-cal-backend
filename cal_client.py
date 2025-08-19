@@ -228,23 +228,27 @@ class CalClient:
             logger.info(f"Creating booking with start (UTC): {start_time}")
             logger.info(f"Original IST time: {target_date}T{time}:00")
             
+            # Use the exact structure from official Cal.com v2 documentation
             booking_data = {
                 "start": start_time,
+                "attendee": {
+                    "name": candidate_name,
+                    "email": email_id,
+                    "timeZone": "Asia/Kolkata",
+                    "language": "en"
+                },
                 "eventTypeId": event_type["id"],
-                "attendees": [
-                    {
-                        "name": candidate_name,
-                        "email": email_id,
-                        "timeZone": "Asia/Kolkata",
-                        "language": "en"
-                    }
-                ],
-                "meetingUrl": None,  # Let Cal.com auto-generate
-                "metadata": {},
-                "lengthInMinutes": event_type.get("length", 30),
-                "instant": False,  # Regular booking
-                "location": None  # Let Cal.com use default conferencing
+                "eventTypeSlug": event_type.get("slug", "build3-demo"),
+                "username": "roshan-flavis",  # Primary team member
+                "teamSlug": "soraaya-team",
+                "metadata": {}
             }
+            
+            # Add optional fields only if they have valid values
+            if event_type.get("length"):
+                booking_data["lengthInMinutes"] = event_type.get("length")
+            
+            print(f"DEBUG: Official docs structure booking data: {booking_data}")
             
             # Log the complete booking data
             logger.info(f"Complete booking data: {booking_data}")
@@ -282,6 +286,11 @@ class CalClient:
                 else:
                     error_data = response.json()
                     error_message = error_data.get("message", "Unknown error")
+                    error_code = error_data.get("error", {}).get("code", "Unknown")
+                    
+                    # Log the full error response for debugging
+                    logger.error(f"Cal.com API v2 error response: {error_data}")
+                    print(f"DEBUG: Full error response: {error_data}")
                     
                     # Handle specific Cal.com v2 API error cases
                     if error_message == "no_available_users_found_error":
@@ -295,7 +304,7 @@ class CalClient:
                             "Please contact your administrator to assign team members."
                         )
                     else:
-                        raise Exception(f"Cal.com API v2 error: {error_message}")
+                        raise Exception(f"Cal.com API v2 error: {error_message} (Code: {error_code})")
                         
         except httpx.HTTPStatusError as e:
             # Log detailed error information
