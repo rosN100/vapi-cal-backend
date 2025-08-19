@@ -454,48 +454,50 @@ class CalClient:
             return []
     
     def _process_real_availability(self, availability_data: Dict, target_date: date) -> List[Dict]:
-        """Process real availability data from Cal.com API."""
+        """Process real availability data from Cal.com API v2 /slots/available endpoint."""
         try:
             available_slots = []
+            target_date_str = target_date.strftime('%Y-%m-%d')
+
+            print(f"DEBUG: Processing availability data for date: {target_date_str}")
+            print(f"DEBUG: Full availability data: {availability_data}")
+
+            # The new /v2/slots/available endpoint returns data in this structure:
+            # {"data": {"slots": {"2025-08-22": [{"time": "2025-08-22T04:30:00.000Z"}, ...]}}}
             
-            # The response structure might vary, let's handle different formats
-            slots = []
-            if availability_data.get("data", {}).get("slots"):
-                slots = availability_data.get("data", {}).get("slots", [])
-            elif availability_data.get("slots"):
-                slots = availability_data.get("slots", [])
-            elif availability_data.get("data"):
-                slots = availability_data.get("data", [])
-            
-            print(f"DEBUG: Processing {len(slots)} slots from availability data")
-            
-            for slot in slots:
+            slots_data = availability_data.get("data", {}).get("slots", {})
+            print(f"DEBUG: Slots data structure: {slots_data}")
+
+            # Get slots for the specific target date
+            date_slots = slots_data.get(target_date_str, [])
+            print(f"DEBUG: Found {len(date_slots)} slots for date {target_date_str}")
+
+            for slot in date_slots:
                 # Extract start time from the slot data
                 start_time = slot.get("time", "")
                 if start_time:
-                    # Convert UTC time to IST and format as HH:MM
                     try:
-                        # Parse the time and create a proper slot
-                        slot_start = start_time
-                        if isinstance(slot_start, str) and "T" in slot_start:
-                            # Extract time part from ISO string
-                            time_part = slot_start.split("T")[1][:5]  # Get HH:MM part
+                        # Parse the ISO time string and extract HH:MM part
+                        if isinstance(start_time, str) and "T" in start_time:
+                            # Extract time part from ISO string (e.g., "2025-08-22T04:30:00.000Z" -> "04:30")
+                            time_part = start_time.split("T")[1][:5]
+                            
+                            # Create slot with 30-minute duration
+                            available_slots.append({
+                                "start_time": time_part,
+                                "end_time": self._add_minutes_to_time(time_part, 30),
+                                "available": True
+                            })
+                            print(f"DEBUG: Added slot: {time_part} - {self._add_minutes_to_time(time_part, 30)}")
                         else:
-                            time_part = str(slot_start)
-                        
-                        # Create slot with 30-minute duration (based on event type)
-                        available_slots.append({
-                            "start_time": time_part,
-                            "end_time": self._add_minutes_to_time(time_part, 30),
-                            "available": True
-                        })
+                            print(f"DEBUG: Skipping slot with invalid time format: {start_time}")
                     except Exception as e:
                         print(f"DEBUG: Error processing slot {slot}: {e}")
                         continue
-            
-            print(f"DEBUG: Processed {len(available_slots)} available slots")
+
+            print(f"DEBUG: Successfully processed {len(available_slots)} available slots")
             return available_slots
-            
+
         except Exception as e:
             print(f"DEBUG: Error processing availability data: {e}")
             logger.error(f"Error processing availability data: {e}")
