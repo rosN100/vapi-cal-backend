@@ -229,19 +229,21 @@ class CalClient:
             logger.info(f"Original IST time: {target_date}T{time}:00")
             
             booking_data = {
-                "eventTypeId": event_type["id"],
                 "start": start_time,
-                "attendee": {
-                    "email": email_id,
-                    "name": candidate_name,
-                    "timeZone": "Asia/Kolkata"
-                },
-                "language": "en",
+                "eventTypeId": event_type["id"],
+                "attendees": [
+                    {
+                        "name": candidate_name,
+                        "email": email_id,
+                        "timeZone": "Asia/Kolkata",
+                        "language": "en"
+                    }
+                ],
+                "meetingUrl": None,  # Let Cal.com auto-generate
                 "metadata": {},
-                "responses": {
-                    "email": email_id,
-                    "name": candidate_name
-                }
+                "lengthInMinutes": event_type.get("length", 30),
+                "instant": False,  # Regular booking
+                "location": None  # Let Cal.com use default conferencing
             }
             
             # Log the complete booking data
