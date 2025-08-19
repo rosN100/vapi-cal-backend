@@ -97,18 +97,25 @@ class CalClient:
                 
                 # Use the correct /v2/slots/available endpoint with proper parameters
                 slots_url = f"{self.base_url}/slots/available"
+                
+                # Business hours: 9:00 AM - 5:00 PM IST
+                # Convert to UTC: IST = UTC+5:30
+                # 9:00 AM IST = 3:30 AM UTC, 5:00 PM IST = 11:30 AM UTC
                 params = {
                     "eventTypeId": str(event_type_id),  # Event type ID from the found event
                     "eventTypeSlug": event_type.get('slug', 'build3-demo'),  # Event type slug
-                    "startTime": f"{target_date_str}T00:00:00Z",
-                    "endTime": f"{target_date_str}T23:59:59Z",
+                    "startTime": f"{target_date_str}T03:30:00Z",  # 9:00 AM IST
+                    "endTime": f"{target_date_str}T11:30:00Z",   # 5:00 PM IST
                     "duration": str(event_type.get('length', 30)),  # Duration from event type (default 30)
+                    "timeZone": "Asia/Kolkata",  # Team timezone
                     "usernameList[]": ["roshan-flavis", "naman3vedi"]  # Both team members
                 }
                 
                 print(f"DEBUG: Using CORRECT Cal.com v2 /slots/available endpoint with eventTypeId + usernameList")
                 print(f"DEBUG: Making GET request to: {slots_url}")
                 print(f"DEBUG: Query parameters: {params}")
+                print(f"DEBUG: Business hours: 9:00 AM - 5:00 PM IST (3:30 AM - 11:30 AM UTC)")
+                print(f"DEBUG: This should return all available slots within business hours")
                 
                 async with httpx.AsyncClient() as client:
                     response = await client.get(slots_url, params=params, headers=headers)
