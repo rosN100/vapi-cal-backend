@@ -92,20 +92,21 @@ class CalClient:
                 print(f"DEBUG: This is a team event (teamId: {team_id})")
                 logger.info(f"DEBUG: This is a team event (teamId: {team_id})")
                 
-                # For team events, use the CORRECT Cal.com API v2 /slots endpoint
-                # Based on official documentation: GET /v2/slots with teamSlug and eventTypeSlug
+                # For team events, use the CORRECT Cal.com API v2 /slots/available endpoint
+                # Based on research: GET /v2/slots/available with eventTypeId and usernameList[]
                 
-                # Use the correct /v2/slots endpoint with proper parameters
-                slots_url = f"{self.base_url}/slots"
+                # Use the correct /v2/slots/available endpoint with proper parameters
+                slots_url = f"{self.base_url}/slots/available"
                 params = {
-                    "teamSlug": "soraaya-team",  # Correct parameter name
-                    "eventTypeSlug": event_type.get('slug', 'build3-demo'),  # Correct parameter name
+                    "eventTypeId": str(event_type_id),  # Event type ID from the found event
+                    "eventTypeSlug": event_type.get('slug', 'build3-demo'),  # Event type slug
                     "startTime": f"{target_date_str}T00:00:00Z",
                     "endTime": f"{target_date_str}T23:59:59Z",
-                    "timeZone": "Asia/Kolkata"  # Use the exact timezone from docs
+                    "duration": str(event_type.get('length', 30)),  # Duration from event type (default 30)
+                    "usernameList[]": ["roshan-flavis", "naman3vedi"]  # Both team members
                 }
                 
-                print(f"DEBUG: Using CORRECT Cal.com v2 /slots endpoint with teamSlug + eventTypeSlug")
+                print(f"DEBUG: Using CORRECT Cal.com v2 /slots/available endpoint with eventTypeId + usernameList")
                 print(f"DEBUG: Making GET request to: {slots_url}")
                 print(f"DEBUG: Query parameters: {params}")
                 
@@ -132,148 +133,9 @@ class CalClient:
                             "message": f"Found {len(available_slots)} available slots"
                         }
                     else:
-                        print(f"DEBUG: Team approach 1 failed with status: {response.status_code}")
+                        print(f"DEBUG: /slots/available endpoint failed with status: {response.status_code}")
                         print(f"DEBUG: Response body: {response.text}")
-                        
-                        # Approach 2: Try team-specific endpoint structure
-                        print(f"DEBUG: Trying team approach 2 - team-specific endpoint")
-                        team_slots_url = f"{self.base_url}/teams/{team_id}/availability"
-                        params2 = {
-                            "eventTypeId": str(event_type_id),
-                            "startTime": f"{target_date_str}T00:00:00Z",
-                            "endTime": f"{target_date_str}T23:59:59Z",
-                            "timeZone": "Asia/Calcutta"
-                        }
-                        
-                        response2 = await client.get(team_slots_url, params=params2, headers=headers)
-                        print(f"DEBUG: Approach 2 response status: {response2.status_code}")
-                        
-                        if response2.status_code == 200:
-                            data = response2.json()
-                            print(f"DEBUG: Approach 2 response data: {data}")
-                            
-                            # Parse the real availability data
-                            available_slots = self._process_real_availability(data, target_date)
-                            
-                            # Format the response as readable text
-                            formatted_response = self._format_availability_response(available_slots, target_date)
-                            
-                            return {
-                                "success": True,
-                                "target_date": target_date.strftime('%Y-%m-%d'),
-                                "available_slots": available_slots,
-                                "formatted_response": formatted_response,
-                                "message": f"Found {len(available_slots)} available slots"
-                            }
-                        else:
-                            print(f"DEBUG: Team approach 2 also failed with status: {response2.status_code}")
-                            print(f"DEBUG: Response body: {response2.text}")
-                            
-                            # Approach 3: Try booking-style endpoint (since this is for availability checking for booking)
-                            print(f"DEBUG: Trying team approach 3 - booking-style endpoint")
-                            booking_url = f"{self.base_url}/bookings/availability"
-                            params3 = {
-                                "eventTypeSlug": event_type.get('slug', 'build3-demo'),
-                                "teamSlug": "soraaya-team",
-                                "date": target_date_str,
-                                "timeZone": "Asia/Calcutta"
-                            }
-                            
-                            response3 = await client.get(booking_url, params=params3, headers=headers)
-                            print(f"DEBUG: Approach 3 response status: {response3.status_code}")
-                            
-                            if response3.status_code == 200:
-                                data = response3.json()
-                                print(f"DEBUG: Approach 3 response data: {data}")
-                                
-                                # Parse the real availability data
-                                available_slots = self._process_real_availability(data, target_date)
-                                
-                                # Format the response as readable text
-                                formatted_response = self._format_availability_response(available_slots, target_date)
-                                
-                                return {
-                                    "success": True,
-                                    "target_date": target_date.strftime('%Y-%m-%d'),
-                                    "available_slots": available_slots,
-                                    "formatted_response": formatted_response,
-                                    "message": f"Found {len(available_slots)} available slots"
-                                }
-                            else:
-                                print(f"DEBUG: Approach 3 also failed")
-                                print(f"DEBUG: Approach 3 response body: {response3.text}")
-                                
-                                # Approach 4: Try routing forms endpoint (from Cal.com docs: "get available slots")
-                                print(f"DEBUG: Trying team approach 4 - routing forms endpoint")
-                                routing_url = f"{self.base_url}/routing-forms/response"
-                                params4 = {
-                                    "eventTypeSlug": event_type.get('slug', 'build3-demo'),
-                                    "teamSlug": "soraaya-team",
-                                    "date": target_date_str
-                                }
-                                
-                                response4 = await client.post(routing_url, json=params4, headers=headers)
-                                print(f"DEBUG: Approach 4 response status: {response4.status_code}")
-                                
-                                if response4.status_code == 200:
-                                    data = response4.json()
-                                    print(f"DEBUG: Approach 4 response data: {data}")
-                                    
-                                    # Parse the real availability data
-                                    available_slots = self._process_real_availability(data, target_date)
-                                    
-                                    # Format the response as readable text
-                                    formatted_response = self._format_availability_response(available_slots, target_date)
-                                    
-                                    return {
-                                        "success": True,
-                                        "target_date": target_date.strftime('%Y-%m-%d'),
-                                        "available_slots": available_slots,
-                                        "formatted_response": formatted_response,
-                                        "message": f"Found {len(available_slots)} available slots"
-                                    }
-                                else:
-                                    print(f"DEBUG: All team approaches failed including routing forms")
-                                    print(f"DEBUG: Approach 4 response body: {response4.text}")
-                                    
-                                    # Final attempt: Use Cal.com API v1 for availability (since v2 doesn't seem to support it)
-                                    print(f"DEBUG: Final attempt - trying Cal.com API v1 for availability")
-                                    v1_url = "https://api.cal.com/v1/availability"
-                                    v1_params = {
-                                        "eventTypeSlug": event_type.get('slug', 'build3-demo'),
-                                        "teamSlug": "soraaya-team",
-                                        "dateFrom": target_date_str,
-                                        "dateTo": target_date_str,
-                                        "timeZone": "Asia/Calcutta",
-                                        "apiKey": self.api_key  # V1 API uses apiKey as query parameter
-                                    }
-                                    
-                                    # V1 API doesn't use Authorization header, only query parameter
-                                    v1_headers = {"Content-Type": "application/json"}
-                                    response5 = await client.get(v1_url, params=v1_params, headers=v1_headers)
-                                    print(f"DEBUG: V1 API response status: {response5.status_code}")
-                                    
-                                    if response5.status_code == 200:
-                                        data = response5.json()
-                                        print(f"DEBUG: V1 API response data: {data}")
-                                        
-                                        # Parse the v1 availability data
-                                        available_slots = self._process_real_availability(data, target_date)
-                                        
-                                        # Format the response as readable text
-                                        formatted_response = self._format_availability_response(available_slots, target_date)
-                                        
-                                        return {
-                                            "success": True,
-                                            "target_date": target_date.strftime('%Y-%m-%d'),
-                                            "available_slots": available_slots,
-                                            "formatted_response": formatted_response,
-                                            "message": f"Found {len(available_slots)} available slots (via v1 API)"
-                                        }
-                                    else:
-                                        print(f"DEBUG: V1 API also failed with status: {response5.status_code}")
-                                        print(f"DEBUG: V1 API response body: {response5.text}")
-                                        raise Exception(f"Failed to check team availability: All v2 and v1 endpoints returned 404")
+                        raise Exception(f"Failed to check team availability: HTTP {response.status_code}")
             else:
                 # Personal event - try different endpoints since /slots doesn't exist
                 print(f"DEBUG: This is a personal event")
