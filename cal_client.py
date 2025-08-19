@@ -228,7 +228,7 @@ class CalClient:
             logger.info(f"Creating booking with start (UTC): {start_time}")
             logger.info(f"Original IST time: {target_date}T{time}:00")
             
-            # Use the exact structure from official Cal.com v2 documentation
+            # Use the working structure from successful API call
             booking_data = {
                 "start": start_time,
                 "attendee": {
@@ -244,11 +244,7 @@ class CalClient:
                 "metadata": {}
             }
             
-            # Add optional fields only if they have valid values
-            if event_type.get("length"):
-                booking_data["lengthInMinutes"] = event_type.get("length")
-            
-            print(f"DEBUG: Official docs structure booking data: {booking_data}")
+            print(f"DEBUG: Working booking data structure: {booking_data}")
             
             # Log the complete booking data
             logger.info(f"Complete booking data: {booking_data}")
