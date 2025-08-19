@@ -477,18 +477,37 @@ class CalClient:
                 start_time = slot.get("time", "")
                 if start_time:
                     try:
-                        # Parse the ISO time string and extract HH:MM part
+                        # Parse the ISO time string and convert UTC to IST
                         if isinstance(start_time, str) and "T" in start_time:
-                            # Extract time part from ISO string (e.g., "2025-08-22T04:30:00.000Z" -> "04:30")
-                            time_part = start_time.split("T")[1][:5]
-                            
-                            # Create slot with 30-minute duration
-                            available_slots.append({
-                                "start_time": time_part,
-                                "end_time": self._add_minutes_to_time(time_part, 30),
-                                "available": True
-                            })
-                            print(f"DEBUG: Added slot: {time_part} - {self._add_minutes_to_time(time_part, 30)}")
+                            try:
+                                from datetime import datetime, timezone, timedelta
+                                
+                                # Parse the UTC time from ISO string
+                                utc_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                                
+                                # Convert to IST (UTC+5:30)
+                                ist_timezone = timezone(timedelta(hours=5, minutes=30))
+                                ist_time = utc_time.astimezone(ist_timezone)
+                                
+                                # Extract HH:MM part in IST
+                                time_part = ist_time.strftime("%H:%M")
+                                
+                                # Create slot with 30-minute duration
+                                available_slots.append({
+                                    "start_time": time_part,
+                                    "end_time": self._add_minutes_to_time(time_part, 30),
+                                    "available": True
+                                })
+                                print(f"DEBUG: Converted {start_time} UTC to {time_part} IST")
+                            except Exception as e:
+                                print(f"DEBUG: Error converting timezone for {start_time}: {e}")
+                                # Fallback to original time if conversion fails
+                                time_part = start_time.split("T")[1][:5]
+                                available_slots.append({
+                                    "start_time": time_part,
+                                    "end_time": self._add_minutes_to_time(time_part, 30),
+                                    "available": True
+                                })
                         else:
                             print(f"DEBUG: Skipping slot with invalid time format: {start_time}")
                     except Exception as e:
